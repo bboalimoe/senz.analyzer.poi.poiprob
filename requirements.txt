@@ -1,2 +1,7 @@
 leancloud-sdk
 flask
+numpy
+scikit-learn
+blinker
+logentries
+bugsnag

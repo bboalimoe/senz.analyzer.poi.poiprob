@@ -1,0 +1,35 @@
+__all__ = ["LOGENTRIES_TOKEN", "BUGSNAG_TOKEN", "APP_ENV"]
+import os
+
+# Settings
+
+LOGENTRIES_DEV_TOKEN = "8c97ce63-1122-4f25-bd19-2dbdccd74262"
+LOGENTRIES_PROD_TOKEN = "1ecd5d3b-50ef-4901-98e6-90913fccd247"
+LOGENTRIES_LOCAL_TOKEN = "8c97ce63-1122-4f25-bd19-2dbdccd74262"
+
+BUGSNAG_DEV_TOKEN = "4e9d25b887d3a644773a5538815c3986"
+BUGSNAG_PROD_TOKEN = "5355907b8972b20d4115e635f729942d"
+BUGSNAG_LOCAL_TOKEN = "4e9d25b887d3a644773a5538815c3986"
+
+LOGENTRIES_TOKEN = ""
+BUGSNAG_TOKEN = ""
+APP_ENV = ""
+
+# Configuration
+
+try:
+    APP_ENV = os.environ["APP_ENV"]
+except KeyError, key:
+    print "KeyError: There is no env var named %s" % key
+    print "The local env will be applied"
+    APP_ENV = "local"
+finally:
+    if APP_ENV == "test":
+        LOGENTRIES_TOKEN = LOGENTRIES_DEV_TOKEN
+        BUGSNAG_TOKEN = BUGSNAG_DEV_TOKEN
+    elif APP_ENV == "prod":
+        LOGENTRIES_TOKEN = LOGENTRIES_PROD_TOKEN
+        BUGSNAG_TOKEN = BUGSNAG_PROD_TOKEN
+    elif APP_ENV == "local":
+        LOGENTRIES_TOKEN = LOGENTRIES_LOCAL_TOKEN
+        BUGSNAG_TOKEN = BUGSNAG_LOCAL_TOKEN
