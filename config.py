@@ -30,27 +30,30 @@ TEST_BUGSNAG_TOKEN = '8d89ec939c4b02920f0c6696fad7256f'
 PROD_BUGSNAG_TOKEN = '712e8dc9619eea3532c761830a64d9fb'
 
 # Choose keys according to APP_ENV
-try:
-    APP_ENV = os.environ['APP_ENV']
-except KeyError, key:
-    print("KeyError: There's no evn var named %s" % (key))
-    print("The local env will be applied")
+if os.environ.get('LC_APP_PROD') == '1':
+    # prod environ
+    APP_ENV = 'prod'
+elif os.environ.get('LC_APP_PROD') == '0':
+    # test environ
+    APP_ENV = 'test'
+else:
+    # dev environ
     APP_ENV = 'local'
-finally:
-    if APP_ENV == 'test':
-        APP_ID = TEST_APP_ID
-        MASTER_KEY = TEST_MASTER_KEY
-        LOGENTRIES_TOKEN = TEST_LOGENTRIES_TOKEN
-        BUGSNAG_TOKEN = TEST_BUGSNAG_TOKEN
-    elif APP_ENV == 'prod':
-        APP_ID = PROD_APP_ID
-        MASTER_KEY = PROD_MASTER_KEY
-        LOGENTRIES_TOKEN = PROD_LOGENTRIES_TOKEN
-        BUGSNAG_TOKEN = PROD_BUGSNAG_TOKEN
-    elif APP_ENV == 'local':
-        APP_ID = TEST_APP_ID
-        MASTER_KEY = TEST_MASTER_KEY
-        LOGENTRIES_TOKEN = LOCAL_LOGENTRIES_TOKEN
-        BUGSNAG_TOKEN = LOCAL_BUGSNAG_TOKEN
-    else:
-        raise ValueError('Unvalid APP_ENV: %s' %(APP_ENV))
+print('-'*20 + '\n|  APP_ENV = %s |\n' %(APP_ENV) + '-'*20)
+if APP_ENV == 'test':
+    APP_ID = TEST_APP_ID
+    MASTER_KEY = TEST_MASTER_KEY
+    LOGENTRIES_TOKEN = TEST_LOGENTRIES_TOKEN
+    BUGSNAG_TOKEN = TEST_BUGSNAG_TOKEN
+elif APP_ENV == 'prod':
+    APP_ID = PROD_APP_ID
+    MASTER_KEY = PROD_MASTER_KEY
+    LOGENTRIES_TOKEN = PROD_LOGENTRIES_TOKEN
+    BUGSNAG_TOKEN = PROD_BUGSNAG_TOKEN
+elif APP_ENV == 'local':
+    APP_ID = TEST_APP_ID
+    MASTER_KEY = TEST_MASTER_KEY
+    LOGENTRIES_TOKEN = LOCAL_LOGENTRIES_TOKEN
+    BUGSNAG_TOKEN = LOCAL_BUGSNAG_TOKEN
+else:
+    raise ValueError('Unvalid APP_ENV: %s' %(APP_ENV))
