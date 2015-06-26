@@ -1,6 +1,7 @@
 leancloud-sdk
 flask
 numpy
+scipy
 scikit-learn
 blinker
 logentries
