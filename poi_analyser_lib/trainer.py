@@ -21,55 +21,62 @@ class Trainer(object):
             raise ModelInitError(self.n_c, self.c_t, self.n_i)
 
         if init_params.has_key("params"):
-            gmm_param = init_params["params"]
-            try:
+            gmm_param = init_params
+            if gmm_param.has_key("covars"):
                 self.gmm.covars_ = np.array(gmm_param["covars"])
+            if gmm_param.has_key("means"):
                 self.gmm.means_ = np.array(gmm_param["means"])
+            if gmm_param.has_key("weights"):
                 self.gmm.weights_ = np.array(gmm_param["weights"])
-            except KeyError, error_key:
-                raise ModelParamKeyError(error_key)
 
     def fit(self, x):
         self.x = x
         _x = np.array(x)
         if _x.ndim == 1:
             _x = _x.reshape([len(x), 1])
-        try:
-            self.gmm.fit(X=_x, y=None)
-        except:
-            params = {
-                "initParams": self.gmm,
-                "covars": self.gmm.covars_,
-                "means": self.gmm.means_,
-                "weights": self.gmm.weights_
-            }
-            raise FittingError(_x, params)
+        self.gmm.fit(X=_x, y=None)
+
+    def trainRandomly(self, init_means, seq_count, covariance):
+        '''train model with random sequence
+
+        Parameters
+        ----------
+        init_means: list
+          every elem represent one mean
+        seq_count: int
+        covariance: double
+
+        Returns
+        -------
+        flag: bool
+        '''
+        from datasets import generate_train_dataset
+        seq = generate_train_dataset(init_means, seq_count, covariance)
+        self.fit(seq)
+
+        return True
 
     def modelParams(self):
         new_params = {
             "nMix": self.n_c,
+            "nIter": self.n_i,
             "covarianceType": self.c_t,
             "count": self.count + len(self.x),
-            "params": {
-                "nMix": self.n_c,
-                "covarianceType": self.c_t,
-                "params": {
-                    "covars": self.gmm.covars_.tolist(),
-                    "means": self.gmm.means_.tolist(),
-                    "weights": self.gmm.weights_.tolist()
-                }
-            }
+            "covars": self.gmm.covars_.tolist(),
+            "means": self.gmm.means_.tolist(),
+            "weights": self.gmm.weights_.tolist(),
         }
         return new_params
 
 
 if __name__ == "__main__":
-    _model = {"nMix": 4, "covarianceType": "full", "nIter": 50, "count": 100,
-              "params": {"nMix": 4, "covarianceType": "full", "params": {
-                  "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]],
-                             [[0.26113702790883486]]],
-                  "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
-                  "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326], [6.571810554595958]]}}}
+    _model = {"nMix": 4, "covarianceType": "full", "nIter": 100, "count": 1,
+              "params": {"nMix": 4, "covarianceType": "full", "nIter": 100,
+                         "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]],
+                                    [[0.26113702790883486]]],
+                         "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
+                         "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326],
+                                   [6.571810554595958]]}}
 
     # _model = {"nMix": 4, "covarianceType": "full", "nIter": 50,
     #           "params": {"nMix": 4, "covarianceType": "full"}

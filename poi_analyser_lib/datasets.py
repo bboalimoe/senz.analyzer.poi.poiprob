@@ -46,6 +46,31 @@ class Dataset(object):
         return dataset
 
 
+def generate_train_dataset(init_means, seq_count, covariance):
+    '''
+    generage train dataset for gmm, size is seq_count
+
+    Parameters
+    ----------
+    init_means: list
+      every elem represent one mean
+    seq_count: int
+    covariance: double
+
+    Returns
+    -------
+    result: list
+      len(result) == seq_count
+    '''
+    result = []
+
+    for mean in init_means:
+        result += list(ss.norm.rvs(loc=mean, scale=covariance, size=seq_count))
+    random.shuffle(result)
+
+    return result[:seq_count]
+
+
 if __name__ == "__main__":
     obs = [
         {"poiType": "restaurant"},
@@ -60,3 +85,5 @@ if __name__ == "__main__":
 
     print d.getDataset()
 
+    print('-'*20)
+    print(generate_train_dataset([-10,10], 5, 1))
