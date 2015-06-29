@@ -192,17 +192,18 @@ def train_gmm_randomly():
                      model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
-    logger.info('<%s>, [train gmm randomly] success')
+    logger.info('<%s>, [train gmm randomly] success' % (x_request_id))
     return json.dumps(result)
 
 
-@app.route('/gmm/train/', methods=['POST'])
-def train_gmm():
+@app.route('/gmm/trainWithSeq/', methods=['POST'])
+def train_gmm_with_seqs():
     '''train gmm with input sequence
 
     Parameters
     ---------
     data: JSON Obj
+      e.g. {"tag":"init_model", "poi_label":"poi#healthcare", "seq":range(24), "description":"train demo"}
       algo_type: string, optional, default 'gmm'
       tag: string
         model tag
@@ -245,8 +246,105 @@ def train_gmm():
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
-    algo_type = incoming_data.get('algo_type', 'gmm')
     tag = incoming_data['tag']
-    poi_label = incoming_data['poi_label']
+    label = incoming_data['poi_label']
     seq = incoming_data['seq']
     description = incoming_data['description']
+    algo_type = incoming_data.get('algo_type', 'gmm')
+
+    model = dao.get_model_by_tag_lable(algo_type, tag, label)
+    description += '\n last params: %s' % (model.get('params'))  # store last params in description
+    _model = {
+        'nMix': model.get('nMix'),
+        'covarianceType': model.get('covarianceType'),
+        'nIter': model.get('nIter'),
+        'count': model.get('count'),
+        'params': model.get('params'),
+    }
+    my_trainer = Trainer(_model)
+    my_trainer.fit(seq)
+    dao.save_gmm('random_train', label, description, my_trainer.modelParams(), model.get('count')+len(seq),
+                 model.get('nIter'))
+    result = {'code': 0, 'message': 'success'}
+    logger.info('<%s>, [train gmm] success' % (x_request_id))
+    logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
+                % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
+    return json.dumps(result)
+
+
+@app.route('/gmm/train/', methods=['POST'])
+def train_gmm():
+    '''train gmm use data in db
+
+    Parameters
+    ---------
+    data: JSON Obj
+      e.g. {"tag":"init_model", "poi_label":"poi#healthcare", "description":"train demo"}
+      algo_type: string, optional, default 'gmm'
+      tag: string
+        model tag
+      poi_label: string
+        model label
+      description: string
+        train message
+      seq_type: int, optional, default 0
+        0 代表用未被训练的数据训练，1 代表用所有数据训练
+
+    Returns
+    -------
+    result: JSON Obj
+      e.g. {"code":0, "message":"success", "result":{}}
+      code: int
+        0 success, 1 fail
+      message: string
+      result: object, optional
+    '''
+    if request.headers.has_key('X-Request-Id') and request.headers['X-Request-Id']:
+        x_request_id = request.headers['X-Request-Id']
+    else:
+        x_request_id = ''
+
+    logger.info('<%s>, [train gmm] enter' %(x_request_id))
+    result = {'code': 1, 'message': ''}
+
+    # params JSON validate
+    try:
+        incoming_data = json.loads(request.data)
+    except ValueError, err_msg:
+        logger.exception('<%s>, [train gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
+        result['message'] = 'Unvalid params: NOT a JSON Object'
+        return json.dumps(result)
+
+    # params key checking
+    for key in ['tag', 'poi_label', 'description']:
+        if key not in incoming_data:
+            logger.error("<%s>, [train gmm] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
+            result['message'] = "Params content Error: can't find key=%s" % (key)
+            return json.dumps(result)
+
+    tag = incoming_data['tag']
+    label = incoming_data['poi_label']
+    description = incoming_data['description']
+    algo_type = incoming_data.get('algo_type', 'gmm')
+    seq_type = incoming_data.get('seq_type', 0)
+
+    seq = dao.get_train_data_by_label(algo_type, label, seq_type)
+    model = dao.get_model_by_tag_lable(algo_type, tag, label)
+    description += '\n last params: %s' % (model.get('params'))  # store last params in description
+    _model = {
+        'nMix': model.get('nMix'),
+        'covarianceType': model.get('covarianceType'),
+        'nIter': model.get('nIter'),
+        'count': model.get('count'),
+        'params': model.get('params'),
+    }
+    my_trainer = Trainer(_model)
+    my_trainer.fit(seq)
+    dao.save_gmm('random_train', label, description, my_trainer.modelParams(), model.get('count')+len(seq),
+                 model.get('nIter'))
+    result = {'code': 0, 'message': 'success'}
+    logger.info('<%s>, [train gmm] success' % (x_request_id))
+    logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
+                % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
+    return json.dumps(result)
+

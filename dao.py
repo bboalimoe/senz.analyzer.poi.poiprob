@@ -79,7 +79,6 @@ def save_init_gmm(tag, event_labels, n_components, covariance_type, covars_, mea
         gmm.set('tag', tag)
         gmm.set('nMix', n_components)
         gmm.set('nIter', nIter)
-        gmm.set('timestamp', datetime.datetime.now())
         gmm.save()
 
     return True
@@ -118,7 +117,6 @@ def save_gmm(tag, event_label, description, params, count, n_iter):
     gmm.set('covarianceType', params['covarianceType'])
     gmm.set('tag', tag)
     gmm.set('nMix', params['nMix'])
-    gmm.set('timestamp', datetime.datetime.now())
     gmm.set('nIter', n_iter)
     gmm.save()
 
@@ -158,4 +156,62 @@ def get_model_by_tag(algo_type, tag):
 
     return recent_models_list
 
+
+def get_model_by_tag_lable(algo_type, tag, label):
+    '''根据tag和label挑出model，如果tag下的label有重复的，选择最新的model.
+
+    Parameters
+    ----------
+    algo_type: string
+      model's name
+    tag: string
+      model's tag
+    label: string
+      model's label
+
+    Returns
+    -------
+    recent_model: Obj
+      model obj
+    '''
+    result = Query.do_cloud_query('select * from %s where tag="%s" and eventLabel="%s" limit 1 order by -updatedAt'
+                                  % (algo_type, tag, label))
+    results = result.results
+    recent_model = results[0]
+
+    return recent_model
+
+def get_train_data_by_label(algo_type, label, flag):
+    '''根据label 和 flag 从 algo_type 对应的表中取出训练数据
+
+    Parameters
+    ----------
+    algo_type: string
+      model's name
+    label: string
+      model's label
+    flag: int
+      0 untrained data, 1 all data
+
+    Returns
+    -------
+    train_data: list
+      list of timestamps
+    '''
+    algo_type_table = algo_type + 'Data'
+
+    if flag == 0:
+        result = Query.do_cloud_query('select * from %s where eventLabel="%s" and isTrain=false' %(algo_type_table, label))
+    elif flag == 1:
+        result = Query.do_cloud_query('select * from %s where eventLabel="%s"' %(algo_type_table, label))
+    else:
+        raise ValueError('flag=%s, should in [0, 1]' % (flag))
+
+    results = result.results
+    train_data = []
+
+    for elem in results:
+        train_data.append(elem.get('timestamp'))
+
+    return train_data
 
