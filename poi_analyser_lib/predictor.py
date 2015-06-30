@@ -3,16 +3,17 @@ from utils import checkCovarianceType
 from sklearn.mixture import GMM
 from exception import *
 
+
 class Predictor(object):
     def __init__(self, models):
-        covars  = []
-        means   = []
+        covars = []
+        means = []
         weights = []
-        sum     = 0           # the sum of each gmm"s sample spot.
-        self.n_mixs      = []
-        self.n_mix       = 0  # the count of Gaussian model of new gmm.
-        self.covar_types = [] # the covariance type of each gmm.
-        self.models      = models
+        sum = 0  # the sum of each gmm"s sample spot.
+        self.n_mixs = []
+        self.n_mix = 0  # the count of Gaussian model of new gmm.
+        self.covar_types = []  # the covariance type of each gmm.
+        self.models = models
 
         # Generate new GMM"s nMix and covarianceType
         for model in self.models:
@@ -28,13 +29,13 @@ class Predictor(object):
         # Generate every Gaussian model params.
         for model in self.models:
             try:
-                params = model["params"]["params"]
+                params = model["params"]
                 for covar in params["covars"]:
                     covars.append(covar)
                 for mean in params["means"]:
                     means.append(mean)
                 for weight in params["weights"]:
-                    weight *= (float(model["count"])/float(sum))
+                    weight *= (float(model["count"]) / float(sum))
                     weights.append(weight)
             except KeyError, error_key:
                 raise ModelParamKeyError(error_key)
@@ -50,10 +51,9 @@ class Predictor(object):
         except:
             raise ModelInitError(self.n_mix, self.covar_types, None)
 
-        self.gmm.covars_  = np.array(covars)
-        self.gmm.means_   = np.array(means)
+        self.gmm.covars_ = np.array(covars)
+        self.gmm.means_ = np.array(means)
         self.gmm.weights_ = np.array(weights)
-
 
     def scores(self, t):
         # To numpy array.
@@ -87,20 +87,23 @@ class Predictor(object):
         return result
 
 
-
 if __name__ == "__main__":
     _model = [{"nMix": 4, "covarianceType": "full", "count": 1000,
-              "params": {"nMix": 4, "covarianceType": "full", "params": {
-                  "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]], [[0.26113702790883486]]],
-                  "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
-                  "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326], [6.571810554595958]]}}},
+               "params": {"nMix": 4, "covarianceType": "full",
+                          "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]],
+                                     [[0.26113702790883486]]],
+                          "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
+                          "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326],
+                                    [6.571810554595958]]}},
               {"nMix": 4, "covarianceType": "full", "count": 500,
-              "params": {"nMix": 4, "covarianceType": "full", "params": {
-                  "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]], [[0.26113702790883486]]],
-                  "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
-                  "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326], [6.571810554595958]]}}}]
+               "params": {"nMix": 4, "covarianceType": "full",
+                          "covars": [[[1.2221303985456107]], [[0.3086663025400781]], [[1.28502444797073]],
+                                     [[0.26113702790883486]]],
+                          "weights": [0.23603795980927875, 0.2527552282253478, 0.2800574289988682, 0.2311493829665058],
+                          "means": [[4.536022877901543], [1.4914085123695209], [3.6895831128524326],
+                                    [6.571810554595958]]}}]
 
-    t = [3.9, 1.0, 2.2]
+    t = [3.9, 1.0, 22.2]
 
     p = Predictor(_model)
     print p.scores(t)

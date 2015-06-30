@@ -12,6 +12,7 @@ import datetime
 import dao
 from config import *
 from poi_analyser_lib.trainer import Trainer
+from poi_analyser_lib.predictor import Predictor
 
 import logging
 from logentries import LogentriesHandler
@@ -22,7 +23,10 @@ from bugsnag.flask import handle_exceptions
 
 # Configure Logentries
 logger = logging.getLogger('logentries')
-logger.setLevel(logging.DEBUG)
+if APP_ENV == 'prod':
+    logger.setLevel(logging.INFO)
+else:
+    logger.setLevel(logging.DEBUG)
 logentries_handler = LogentriesHandler(LOGENTRIES_TOKEN)
 logger.addHandler(logentries_handler)
 
@@ -297,7 +301,7 @@ def train_gmm():
       code: int
         0 success, 1 fail
       message: string
-      result: object, optional
+      result:
     '''
     if request.headers.has_key('X-Request-Id') and request.headers['X-Request-Id']:
         x_request_id = request.headers['X-Request-Id']
@@ -346,5 +350,87 @@ def train_gmm():
     logger.info('<%s>, [train gmm] success' % (x_request_id))
     logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
                 % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
+    return json.dumps(result)
+
+
+@app.route('/gmm/classify/', methods=['POST'])
+def classify_gmm():
+    '''classify data using existing gmm model
+
+    Parameters
+    ---------
+    data: JSON Obj
+      e.g. {"tag":"random_train", "seq":[3600000]}
+      algo_type: string, optional, default 'gmm'
+      tag: string
+        model tag
+      seq: list
+        list of timestamps
+
+    Returns
+    -------
+    result: JSON Obj
+      e.g. {"code":0, "message":"success", "result":{}}
+      code: int
+        0 success, 1 fail
+      message: string
+      result: list
+    '''
+    if request.headers.has_key('X-Request-Id') and request.headers['X-Request-Id']:
+        x_request_id = request.headers['X-Request-Id']
+    else:
+        x_request_id = ''
+
+    logger.info('<%s>, [classify gmm] enter' %(x_request_id))
+    result = {'code': 1, 'message': ''}
+
+    # params JSON validate
+    try:
+        incoming_data = json.loads(request.data)
+    except ValueError, err_msg:
+        logger.exception('<%s>, [classify gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
+        result['message'] = 'Unvalid params: NOT a JSON Object'
+        return json.dumps(result)
+
+    # params key checking
+    for key in ['tag', 'seq']:
+        if key not in incoming_data:
+            logger.error("<%s>, [classify gmm] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
+            result['message'] = "Params content Error: can't find key=%s" % (key)
+            return json.dumps(result)
+
+    tag = incoming_data['tag']
+    seq = incoming_data['seq']
+    algo_type = incoming_data.get('algo_type', 'gmm')
+    logger.debug('<%s>, [classify gmm] params: tag=%s, seq=%s, algo_type=%s' %(x_request_id, tag, seq, algo_type))
+
+    models = dao.get_model_by_tag(algo_type, tag)
+    _models = []
+    labels = []
+    for model in models:
+        labels.append(model.get('eventLabel'))
+        _model = {
+            'nMix': model.get('nMix'),
+            'covarianceType': model.get('covarianceType'),
+            'nIter': model.get('nIter'),
+            'count': model.get('count'),
+            'params': model.get('params'),
+        }
+        _models.append(_model)
+    my_predictor = Predictor(_models)
+
+    score_results = []
+    seq_scores = my_predictor.scores(seq)
+    for scores in seq_scores:
+        score_result = {}
+        for index, score in enumerate(scores):
+            score_result[labels[index]] = score
+        score_results.append(score_result)
+
+    result['code'] = 0
+    result['message'] = 'success'
+    result['result'] = score_results
+    logger.info('<%s> [classify gmm] success' % (x_request_id))
+    logger.debug('<%s> [classify gmm] result: %s' % (x_request_id, score_results))
     return json.dumps(result)
 
