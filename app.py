@@ -192,7 +192,7 @@ def train_gmm_randomly():
         }
         my_trainer = Trainer(_model)
         my_trainer.trainRandomly(poi_configs[label]['initMeans'], seq_count, covariance)
-        dao.save_gmm('random_train', label, model.get('params'), my_trainer.modelParams(), model.get('count')+seq_count,
+        dao.save_gmm('random_train', label, model.get('params'), my_trainer.modelParams(), '', model.get('count')+seq_count,
                      model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
@@ -267,7 +267,7 @@ def train_gmm_with_seqs():
     }
     my_trainer = Trainer(_model)
     my_trainer.fit(seq)
-    dao.save_gmm('random_train', label, description, my_trainer.modelParams(), model.get('count')+len(seq),
+    dao.save_gmm('random_train', label, description, my_trainer.modelParams(), seq, model.get('count')+len(seq),
                  model.get('nIter'))
     result = {'code': 0, 'message': 'success'}
     logger.info('<%s>, [train gmm] success' % (x_request_id))
@@ -332,9 +332,13 @@ def train_gmm():
     algo_type = incoming_data.get('algo_type', 'gmm')
     seq_type = incoming_data.get('seq_type', 0)
 
-    seq = dao.get_train_data_by_label(algo_type, label, seq_type)
+    poi_datas = dao.get_train_data_by_label(label, seq_type)
+    seq = []
+    for elem in poi_datas:
+        seq.append(elem.get('timestamp'))
     model = dao.get_model_by_tag_lable(algo_type, tag, label)
-    description += '\n last params: %s' % (model.get('params'))  # store last params in description
+    # TODO: description 只存description, lastTrainData存上一次训练数据
+    description += 'train model use datas in `poiData`, len=%s' % (len(seq))
     _model = {
         'nMix': model.get('nMix'),
         'covarianceType': model.get('covarianceType'),
@@ -344,13 +348,22 @@ def train_gmm():
     }
     my_trainer = Trainer(_model)
     my_trainer.fit(seq)
-    dao.save_gmm('random_train', label, description, my_trainer.modelParams(), model.get('count')+len(seq),
-                 model.get('nIter'))
-    result = {'code': 0, 'message': 'success'}
-    logger.info('<%s>, [train gmm] success' % (x_request_id))
-    logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
-                % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
-    return json.dumps(result)
+    try:
+        dao.save_gmm('random_train', label, description, my_trainer.modelParams(), seq, model.get('count')+len(seq),
+                     model.get('nIter'))
+        result = {'code': 0, 'message': 'success'}
+        logger.info('<%s>, [train gmm] success' % (x_request_id))
+        logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
+                    % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
+        poi_datas_ids = []
+        for elem in poi_datas:
+            poi_datas_ids.append(elem.id)
+        dao.set_train_data_trained(poi_datas_ids)
+        return json.dumps(result)
+    except Exception:
+        logger.exception('<%s>, [train gmm] oops, dao.save_gmm error' % (x_request_id))
+        result['message'] = '500 Internal Server Error'
+        return json.dumps(result)
 
 
 @app.route('/gmm/classify/', methods=['POST'])

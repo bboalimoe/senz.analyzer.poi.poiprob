@@ -84,7 +84,7 @@ def save_init_gmm(tag, event_labels, n_components, covariance_type, covars_, mea
     return True
 
 
-def save_gmm(tag, event_label, description, params, count, n_iter):
+def save_gmm(tag, event_label, description, params, train_datas, count, n_iter):
     '''
     save gmm
 
@@ -98,6 +98,8 @@ def save_gmm(tag, event_label, description, params, count, n_iter):
       often store last model params
     params: dict
       store gmm model's full params
+    train_datas: string
+      store train datas
     count: int
       num of trained sequences
     n_iter: int
@@ -113,6 +115,7 @@ def save_gmm(tag, event_label, description, params, count, n_iter):
     gmm.set('description', str(description))
     gmm.set('eventLabel', event_label)
     gmm.set('params', params)
+    gmm.set('lastTrainDatas', str(train_datas))
     gmm.set('count', count)
     gmm.set('covarianceType', params['covarianceType'])
     gmm.set('tag', tag)
@@ -181,13 +184,11 @@ def get_model_by_tag_lable(algo_type, tag, label):
 
     return recent_model
 
-def get_train_data_by_label(algo_type, label, flag):
-    '''根据label 和 flag 从 algo_type 对应的表中取出训练数据
+def get_train_data_by_label(label, flag):
+    '''根据label 和 flag 从 poiData 对应的表中取出训练数据
 
     Parameters
     ----------
-    algo_type: string
-      model's name
     label: string
       model's label
     flag: int
@@ -196,22 +197,38 @@ def get_train_data_by_label(algo_type, label, flag):
     Returns
     -------
     train_data: list
-      list of timestamps
+      list of poiData Objs
     '''
-    algo_type_table = algo_type + 'Data'
 
     if flag == 0:
-        result = Query.do_cloud_query('select * from %s where eventLabel="%s" and isTrain=false' %(algo_type_table, label))
+        result = Query.do_cloud_query('select * from poiData where eventLabel="%s" and isTrain=false' %(label))
     elif flag == 1:
-        result = Query.do_cloud_query('select * from %s where eventLabel="%s"' %(algo_type_table, label))
+        result = Query.do_cloud_query('select * from poiData where eventLabel="%s"' %(label))
     else:
         raise ValueError('flag=%s, should in [0, 1]' % (flag))
 
     results = result.results
-    train_data = []
+    return results
 
-    for elem in results:
-        train_data.append(elem.get('timestamp'))
+def set_train_data_trained(object_ids):
+    '''Set poiData column `isTrain` to true during to object_ids
 
-    return train_data
+    Parameters
+    ----------
+    object_ids: list
+      elems of it are strings represent objectId
+
+    Returns
+    -------
+    flag: boolean
+    '''
+    PoiData = Object.extend('poiData')
+    query = Query(PoiData)
+
+    for object_id in object_ids:
+        poi_data = query.get(object_id)
+        poi_data.set('isTrain', True)
+        poi_data.save()
+
+    return True
 
