@@ -7,6 +7,9 @@ __all__ = ['query_config']
 
 from leancloud import Query, Object
 import datetime
+import logging
+
+logger = logging.getLogger('logentries')
 
 def query_config(config_name='pois_type'):
     '''
@@ -199,16 +202,31 @@ def get_train_data_by_label(label, flag):
     train_data: list
       list of poiData Objs
     '''
+    # TODO: query limit 100, refactor to handle big number data
+    train_data = []
+    query_limit = 1000
 
+    PoiData = Object.extend('poiData')
+    query = Query(PoiData)
+    skip_index = 0
+    query.limit(query_limit)
+
+    query.equal_to('eventLabel', label)
     if flag == 0:
-        result = Query.do_cloud_query('select * from poiData where eventLabel="%s" and isTrain=false' %(label))
-    elif flag == 1:
-        result = Query.do_cloud_query('select * from poiData where eventLabel="%s"' %(label))
-    else:
+        query.equal_to('isTrain', False)
+    if flag not in [0, 1]:
         raise ValueError('flag=%s, should in [0, 1]' % (flag))
+    result = query.find()
 
-    results = result.results
-    return results
+    while len(result) > 0:
+        # handle len(result) > 1000
+        logger.debug('[get train data] current skip_index = %s' % (skip_index))
+        skip_index += 1
+        train_data += result
+        query.skip(query_limit * skip_index)
+        result = query.find()
+
+    return train_data
 
 def set_train_data_trained(object_ids):
     '''Set poiData column `isTrain` to true during to object_ids

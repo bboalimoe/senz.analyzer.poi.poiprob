@@ -56,15 +56,7 @@ def init_before_first_request():
     logger.info(init_tag + log_bugsnag_token)
     logger.info(init_tag + log_logentries_token)
 
-@app.route('/tests/', methods=['GET'])
-def handle_test():
-    return 'haha, YES'
-
-@app.route('/config/', methods=['GET'])
-def get_config():
-    return json.dumps(dao.query_config())
-
-@app.route('/gmm/create/', methods=['POST'])
+@app.route('/create/', methods=['POST'])
 def create_init_gmm():
     '''create data in table `gmm` then init the params
 
@@ -125,7 +117,7 @@ def create_init_gmm():
     result = {'code': 0, 'message': 'success'}
     return json.dumps(result)
 
-@app.route('/gmm/trainRandomly/', methods=['POST'])
+@app.route('/trainRandomly/', methods=['POST'])
 def train_gmm_randomly():
     '''train gmm with randomly sequences
 
@@ -200,7 +192,7 @@ def train_gmm_randomly():
     return json.dumps(result)
 
 
-@app.route('/gmm/trainWithSeq/', methods=['POST'])
+@app.route('/trainWithSeq/', methods=['POST'])
 def train_gmm_with_seqs():
     '''train gmm with input sequence
 
@@ -276,7 +268,7 @@ def train_gmm_with_seqs():
     return json.dumps(result)
 
 
-@app.route('/gmm/train/', methods=['POST'])
+@app.route('/train/', methods=['POST'])
 def train_gmm():
     '''train gmm use data in db
 
@@ -337,7 +329,6 @@ def train_gmm():
     for elem in poi_datas:
         seq.append(elem.get('timestamp'))
     model = dao.get_model_by_tag_lable(algo_type, tag, label)
-    # TODO: description 只存description, lastTrainData存上一次训练数据
     description += 'train model use datas in `poiData`, len=%s' % (len(seq))
     _model = {
         'nMix': model.get('nMix'),
@@ -366,7 +357,7 @@ def train_gmm():
         return json.dumps(result)
 
 
-@app.route('/gmm/classify/', methods=['POST'])
+@app.route('/classify/', methods=['POST'])
 def classify_gmm():
     '''classify data using existing gmm model
 
@@ -446,4 +437,3 @@ def classify_gmm():
     logger.info('<%s> [classify gmm] success' % (x_request_id))
     logger.debug('<%s> [classify gmm] result: %s' % (x_request_id, score_results))
     return json.dumps(result)
-
