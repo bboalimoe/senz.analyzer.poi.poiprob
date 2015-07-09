@@ -65,10 +65,39 @@ def generate_train_dataset(init_means, seq_count, covariance):
     result = []
 
     for mean in init_means:
-        result += list(ss.norm.rvs(loc=mean, scale=covariance, size=seq_count))
+        result += ss.norm.rvs(loc=mean, scale=covariance, size=seq_count).astype(int).tolist()
     random.shuffle(result)
 
     return result[:seq_count]
+
+def plot_date(init_means, seq_count, covariance):
+    '''plot date generate by func `generate_train_dateset`
+
+    Parameters
+    ----------
+    init_means: list
+      every elem represent one mean
+    seq_count: int
+    covariance: double
+    '''
+    import arrow
+    from matplotlib.dates import DateFormatter, MinuteLocator
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    loc = MinuteLocator(interval=30)
+    formatter = DateFormatter('%H:%M:%S')
+
+    result = generate_train_dataset(init_means, seq_count, covariance)
+    dates = [arrow.get(e/1000).datetime for e in result]
+    s = np.array([1]*len(dates))
+
+    fix, ax = plt.subplots()
+    plt.plot_date(dates, s)
+    ax.xaxis.set_major_locator(loc)
+    ax.xaxis.set_major_formatter(formatter)
+
+    plt.show()
 
 
 if __name__ == "__main__":

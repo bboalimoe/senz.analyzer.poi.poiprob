@@ -9,6 +9,7 @@ import os
 import json
 from flask import Flask, request
 import datetime
+import time
 import dao
 from config import *
 from poi_analyser_lib.trainer import Trainer
@@ -114,7 +115,7 @@ def create_init_gmm():
     means_ = [i*3600*1000 for i in xrange(24)]
     poi_configs = dao.query_config()
     covars_ = [covariance_value] * n_components
-    tag = 'init_model'
+    tag = 'init_model_%s' % (int(time.time()))
 
     dao.save_init_gmm(tag, poi_configs.keys(), n_components, covariance_type, covars_, means_)
 
@@ -128,14 +129,14 @@ def train_gmm_randomly():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"tag":"random_train", "seq_count":30, "covariance":60000, "algo_type":"gmm"}
+      e.g. {"tag":"random_train", "seq_count":30, "covariance":3600000, "algo_type":"gmm"}
       tag: string
         model's tag after train
       tag_source: string, optional, default 'init_model'
         source model's tag
       seq_count: int
         train sequence length
-      covariance: float, optional, default 10*60*1000 (10 mins)
+      covariance: float, optional, default 1000 * 60 * 60 (1 hour)
         sequence covariance. And seq means are from `config` table
       algo_type: string, optional, default 'gmm'
 
@@ -174,7 +175,7 @@ def train_gmm_randomly():
     tag_target = incoming_data['tag']
     tag_source = incoming_data.get('tag_source', 'init_model')
     seq_count = incoming_data['seq_count']
-    covariance = incoming_data.get('covariance', 60000)
+    covariance = incoming_data.get('covariance', 3600000)
     algo_type = incoming_data.get('algo_type', 'gmm')
 
     # Start train model
@@ -185,7 +186,6 @@ def train_gmm_randomly():
         if label.find('unknown') != -1 or label.find('others') != -1:  # ignore label `unknown`
             continue
         logger.info('<%s>, [train randomly] start train label=%s model' % (x_request_id, label))
-        #print('current label=%s' % (label))
         _model = {
             'nMix': model.get('nMix'),
             'covarianceType': model.get('covarianceType'),
@@ -375,7 +375,7 @@ def classify_gmm():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"tag":"random_train", "seq":[3600000]}
+      e.g. {"tag":"random_train", "seq":[3600000, 50400000]}
       algo_type: string, optional, default 'gmm'
       tag: string
         model tag
@@ -419,7 +419,13 @@ def classify_gmm():
     algo_type = incoming_data.get('algo_type', 'gmm')
     logger.debug('<%s>, [classify gmm] params: tag=%s, seq=%s, algo_type=%s' %(x_request_id, tag, seq, algo_type))
 
+    # classify
     models = dao.get_model_by_tag(algo_type, tag)
+    if not models:
+        result['message'] = "There's no model's tag=%s" % (tag)
+        logger.info('<%s>, [classify] request not exist model tag=%s' % (x_request_id, tag))
+        return json.dumps(result)
+
     _models = []
     labels = []
     for model in models:
@@ -441,10 +447,39 @@ def classify_gmm():
         for index, score in enumerate(scores):
             score_result[labels[index]] = score
         score_results.append(score_result)
+    # store seq in db
+    for index, timestamp in enumerate(seq):
+        event_label = max(score_results[index].iterkeys(), key=lambda key: score_results[index][key])
+        dao.save_train_data(timestamp, event_label)
+        logger.info('<%s> [classify] store timestamp=%s, label=%s to db success' % (x_request_id, timestamp, event_label))
+
+    logger.info('<%s> [classify gmm] success' % (x_request_id))
+    logger.debug('<%s> [classify gmm] result: %s' % (x_request_id, score_results))
 
     result['code'] = 0
     result['message'] = 'success'
     result['result'] = score_results
-    logger.info('<%s> [classify gmm] success' % (x_request_id))
-    logger.debug('<%s> [classify gmm] result: %s' % (x_request_id, score_results))
     return json.dumps(result)
+
+
+@app.route('/locationprob/', methods=['POST'])
+def location2poiprob():
+    '''推测用户将去poi的可能性
+
+    Parameters
+    ---------
+    data: JSON Obj
+      userId:
+      user_trace:
+      dev_key: string
+
+    Returns
+    -------
+    result: JSON Obj
+      e.g. {"code":0, "message":"success", "result":{}}
+      code: int
+        0 success, 1 fail
+      message: string
+      result: dict
+    '''
+    pass

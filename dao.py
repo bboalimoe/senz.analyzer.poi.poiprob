@@ -202,7 +202,6 @@ def get_train_data_by_label(label, flag):
     train_data: list
       list of poiData Objs
     '''
-    # TODO: query limit 100, refactor to handle big number data
     train_data = []
     query_limit = 1000
 
@@ -250,3 +249,24 @@ def set_train_data_trained(object_ids):
 
     return True
 
+def save_train_data(seq, event_label):
+    '''Save seq in `poiData`
+
+    Parameters
+    ----------
+    seq: int or list
+    event_label: string
+
+    Returns
+    -------
+    flag: boolean
+    '''
+    PoiData = Object.extend('poiData')
+
+    poidata = PoiData()
+    poidata.set('eventLabel', event_label)
+    poidata.set('timestamp', seq)
+    poidata.set('isTrain', False)
+    poidata.save()
+
+    return True
