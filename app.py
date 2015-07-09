@@ -27,6 +27,10 @@ if APP_ENV == 'prod':
     logger.setLevel(logging.INFO)
 else:
     logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s : %(levelname)s, %(message)s'))
+    logger.addHandler(ch)
 logentries_handler = LogentriesHandler(LOGENTRIES_TOKEN)
 logger.addHandler(logentries_handler)
 
@@ -124,9 +128,11 @@ def train_gmm_randomly():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"tag":"init_model", "seq_count":30, "covariance":60000, "algo_type":"gmm"}
+      e.g. {"tag":"random_train", "seq_count":30, "covariance":60000, "algo_type":"gmm"}
       tag: string
-        model tag
+        model's tag after train
+      tag_source: string, optional, default 'init_model'
+        source model's tag
       seq_count: int
         train sequence length
       covariance: float, optional, default 10*60*1000 (10 mins)
@@ -165,16 +171,21 @@ def train_gmm_randomly():
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
-    tag = incoming_data['tag']
+    tag_target = incoming_data['tag']
+    tag_source = incoming_data.get('tag_source', 'init_model')
     seq_count = incoming_data['seq_count']
     covariance = incoming_data.get('covariance', 60000)
     algo_type = incoming_data.get('algo_type', 'gmm')
 
     # Start train model
     poi_configs = dao.query_config()
-    models = dao.get_model_by_tag(algo_type, tag)
+    models = dao.get_model_by_tag(algo_type, tag_source)
     for model in models:
         label = model.get('eventLabel')
+        if label.find('unknown') != -1 or label.find('others') != -1:  # ignore label `unknown`
+            continue
+        logger.info('<%s>, [train randomly] start train label=%s model' % (x_request_id, label))
+        #print('current label=%s' % (label))
         _model = {
             'nMix': model.get('nMix'),
             'covarianceType': model.get('covarianceType'),
@@ -184,7 +195,7 @@ def train_gmm_randomly():
         }
         my_trainer = Trainer(_model)
         my_trainer.trainRandomly(poi_configs[label]['initMeans'], seq_count, covariance)
-        dao.save_gmm('random_train', label, model.get('params'), my_trainer.modelParams(), '', model.get('count')+seq_count,
+        dao.save_gmm(tag_target, label, model.get('params'), my_trainer.modelParams(), '', model.get('count')+seq_count,
                      model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
