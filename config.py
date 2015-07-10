@@ -1,6 +1,7 @@
 __author__ = 'jiaying.lu'
 
-__all__ = ['APP_ID', 'MASTER_KEY', 'APP_ENV', 'LOGENTRIES_TOKEN', 'BUGSNAG_TOKEN']
+__all__ = ['APP_ID', 'MASTER_KEY', 'APP_ENV', 'LOGENTRIES_TOKEN', 'BUGSNAG_TOKEN',
+           'POI_URL', 'PLACE_URL', 'HOME_OFFICE_URL']
 
 
 import os
@@ -57,3 +58,9 @@ elif APP_ENV == 'local':
     BUGSNAG_TOKEN = LOCAL_BUGSNAG_TOKEN
 else:
     raise ValueError('Unvalid APP_ENV: %s' %(APP_ENV))
+
+
+# for POST urls
+POI_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/pois/'
+PLACE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/places/'
+HOME_OFFICE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'

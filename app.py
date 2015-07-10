@@ -9,17 +9,19 @@ import os
 import json
 from flask import Flask, request
 import datetime
-import time
+import arrow
 import dao
+import core
 from config import *
 from poi_analyser_lib.trainer import Trainer
-from poi_analyser_lib.predictor import Predictor
 
 import logging
 from logentries import LogentriesHandler
 
 import bugsnag
 from bugsnag.flask import handle_exceptions
+
+import requests
 
 
 # Configure Logentries
@@ -115,7 +117,7 @@ def create_init_gmm():
     means_ = [i*3600*1000 for i in xrange(24)]
     poi_configs = dao.query_config()
     covars_ = [covariance_value] * n_components
-    tag = 'init_model_%s' % (int(time.time()))
+    tag = 'init_model_%s000' % (arrow.now().timestamp)   # js timestamp 需要补3个0
 
     dao.save_init_gmm(tag, poi_configs.keys(), n_components, covariance_type, covars_, means_)
 
@@ -414,51 +416,8 @@ def classify_gmm():
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
-    tag = incoming_data['tag']
-    seq = incoming_data['seq']
-    algo_type = incoming_data.get('algo_type', 'gmm')
-    logger.debug('<%s>, [classify gmm] params: tag=%s, seq=%s, algo_type=%s' %(x_request_id, tag, seq, algo_type))
+    result = core.do_classify(incoming_data, x_request_id)
 
-    # classify
-    models = dao.get_model_by_tag(algo_type, tag)
-    if not models:
-        result['message'] = "There's no model's tag=%s" % (tag)
-        logger.info('<%s>, [classify] request not exist model tag=%s' % (x_request_id, tag))
-        return json.dumps(result)
-
-    _models = []
-    labels = []
-    for model in models:
-        labels.append(model.get('eventLabel'))
-        _model = {
-            'nMix': model.get('nMix'),
-            'covarianceType': model.get('covarianceType'),
-            'nIter': model.get('nIter'),
-            'count': model.get('count'),
-            'params': model.get('params'),
-        }
-        _models.append(_model)
-    my_predictor = Predictor(_models)
-
-    score_results = []
-    seq_scores = my_predictor.scores(seq)
-    for scores in seq_scores:
-        score_result = {}
-        for index, score in enumerate(scores):
-            score_result[labels[index]] = score
-        score_results.append(score_result)
-    # store seq in db
-    for index, timestamp in enumerate(seq):
-        event_label = max(score_results[index].iterkeys(), key=lambda key: score_results[index][key])
-        dao.save_train_data(timestamp, event_label)
-        logger.info('<%s> [classify] store timestamp=%s, label=%s to db success' % (x_request_id, timestamp, event_label))
-
-    logger.info('<%s> [classify gmm] success' % (x_request_id))
-    logger.debug('<%s> [classify gmm] result: %s' % (x_request_id, score_results))
-
-    result['code'] = 0
-    result['message'] = 'success'
-    result['result'] = score_results
     return json.dumps(result)
 
 
@@ -469,8 +428,8 @@ def location2poiprob():
     Parameters
     ---------
     data: JSON Obj
-      userId:
-      user_trace:
+      userId: string
+      user_trace: list
       dev_key: string
 
     Returns
@@ -482,4 +441,96 @@ def location2poiprob():
       message: string
       result: dict
     '''
-    pass
+    if request.headers.has_key('X-Request-Id') and request.headers['X-Request-Id']:
+        x_request_id = request.headers['X-Request-Id']
+    else:
+        x_request_id = ''
+
+    logger.info('<%s>, [location2poiprob] enter' %(x_request_id))
+    result = {'code': 1, 'message': ''}
+
+    # params JSON validate
+    try:
+        incoming_data = json.loads(request.data)
+    except ValueError, err_msg:
+        logger.exception('<%s>, [location2poiprob] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
+        result['message'] = 'Unvalid params: NOT a JSON Object'
+        return json.dumps(result)
+
+    # params key checking
+    for key in ['userId', 'user_trace', 'dev_key']:
+        if key not in incoming_data:
+            logger.error("<%s>, [location2poiprob] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
+            result['message'] = "Params content Error: can't find key=%s" % (key)
+            return json.dumps(result)
+
+    user_id = incoming_data['userId']
+    user_trace = incoming_data['user_trace']
+    dev_key = incoming_data['dev_key']
+    logger.info('<%s>, [location2poiprob] params: userId=%s, user_trace=%s, dev_key=%s'
+                % (x_request_id, user_id, user_trace, dev_key))
+
+    # request senz.datasource.poi:/senz/poi/
+    poi_request = {'userId': user_id, 'dev_key': dev_key, 'locations': user_trace}
+    poi_response = requests.post(POI_URL, data=json.dumps(poi_request))
+    if poi_response.status_code != 200:
+        logger.error('<%s>, [location2poiprob] Request poi encounter %s Server Error, url=%s, request=%s'
+                     % (x_request_id, poi_response.status_code, POI_URL, poi_request))
+        result['message'] = 'Request poi encounter %s Server Error' % (poi_response.status_code)
+        return json.dumps(result)
+    poi_results = poi_response.json()
+    poi_results = poi_results['results']['parse_poi']
+    logger.info('<%s>, [location2poiprob] poi_url=%s, request=%s, response=%s'
+                % (x_request_id, POI_URL, poi_request, poi_results))
+
+    # request senz.datasource.poi:/senz/activities/home_office_status/
+    home_office_results = []
+    for geo_point in user_trace:
+        # Only when it's weekday need request
+        if arrow.get(geo_point['timestamp']/1000).isoweekday() > 5:
+            logger.info('<%s>, [location2poiprob] timestamp=%s not in weekday' % (x_request_id, geo_point['timestamp']))
+            home_office_request.append({})
+            continue
+
+        home_office_request = {'userId': user_id, 'dev_key': dev_key, 'timestamp': geo_point['timestamp'],
+                            'geo_point': {'latitude': geo_point['location']['latitude'],
+                                          'longitude': geo_point['location']['longitude']}}
+        logger.debug('request: %s' % (json.dumps(home_office_request)))
+        home_office_response = requests.post(HOME_OFFICE_URL, data=json.dumps(home_office_request))
+        if home_office_response.status_code != 200:
+            logger.error('<%s>, [location2poiprob] Request home_office encounter %s Server Error, url=%s, request=%s'
+                         % (x_request_id, home_office_response.status_code, HOME_OFFICE_URL, home_office_request))
+            result['message'] = 'Request home_office encounter %s Server Error' % (home_office_response.status_code)
+            return json.dumps(result)
+        home_office_result = home_office_response.json()['results']['home_office_status']
+        logger.info('<%s>, [location2poiprob] home_office_url=%s, request=%s, response=%s'
+                    % (x_request_id, HOME_OFFICE_URL, home_office_request, home_office_result))
+        home_office_results.append(home_office_result)
+
+    # request self:/classify/
+    seq = [e['timestamp'] for e in user_trace]
+    classify_request = {'tag': 'randomTrainTrial', 'seq': seq}
+    classify_results = core.do_classify(classify_request, x_request_id)['result']
+    logger.info('<%s>, [location2poiprob] classify request=%s, response=%s'
+                % (x_request_id, classify_request, classify_results))
+
+    # add home office status into poi prob
+    poiprob_results = []
+    for index in xrange(len(poi_results)):
+        if home_office_results[index]:
+            # 如果home_office_status有结果，则给该status 0.5的权重
+            poiprob_result = dict([(key, value/2.0) for (key, value) in classify_results[index].iteritems()])
+            if home_office_results[index]['at_place']['tag'] == 'home':
+                poiprob_result['poi#home'] += 0.5
+            if home_office_results[index]['at_place']['tag'] == 'office':
+                poiprob_result['poi#work_office'] += 0.5
+            poiprob_results.append(poiprob_result)
+        else:
+            poiprob_results.append(classify_results[index])
+
+    # combine all results
+    result['code'] = 0
+    result['message'] = 'success'
+    result['results'] = {'pois': poi_results, 'poiprob': poiprob_results}
+
+    return json.dumps(result)
