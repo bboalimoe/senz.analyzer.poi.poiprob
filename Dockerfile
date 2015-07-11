@@ -9,3 +9,7 @@ RUN mkdir ./leanEngine_app
 
 ADD leanEngine_app ./leanEngine_app
 RUN pip install -r ./leanEngine_app/requirements.txt
+
+RUN python leanEngine_app/wsgi.py >/dev/null 2>&1 &
+
+EXPOSE 9010
