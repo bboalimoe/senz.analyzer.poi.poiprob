@@ -1,8 +1,14 @@
-FROM ubuntu
+FROM python:2.7
 
 MAINTAINER jiaying.lu lujiaying93@foxmail.com
 
-RUN apt-get update && apt-get -y install python-numpy python-scipy python-pip
+RUN apt-get update 
+
+RUN pip install Cython
+RUN pip install numpy
+RUN apt-get install -y python-scipy
+RUN pip install scikit-learn
+RUN pip install hmmlearn
 
 WORKDIR /app
 RUN mkdir ./leanEngine_app
