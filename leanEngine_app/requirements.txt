@@ -1,10 +1,10 @@
 leancloud-sdk
 flask
-Cython
-numpy
-scipy
+#Cython
+#numpy
+#scipy
 scikit-learn
-hmmlearn
+#hmmlearn
 blinker
 logentries
 bugsnag
