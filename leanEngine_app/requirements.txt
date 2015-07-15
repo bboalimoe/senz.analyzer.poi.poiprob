@@ -1,4 +1,4 @@
-leancloud-sdk
+leancloud-sdk==1.2.0
 flask
 #Cython
 #numpy
