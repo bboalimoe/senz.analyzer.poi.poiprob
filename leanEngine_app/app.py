@@ -132,10 +132,10 @@ def train_gmm_randomly():
     ---------
     data: JSON Obj
       e.g. {"tag":"random_train", "seq_count":30, "covariance":3600000, "algo_type":"gmm"}
-      tag: string
-        model's tag after train
-      tag_source: string, optional, default 'init_model'
+      sourceTag: string
         source model's tag
+      targetTag: string
+        model's tag after train
       seq_count: int
         train sequence length
       covariance: float, optional, default 1000 * 60 * 60 (1 hour)
@@ -168,14 +168,14 @@ def train_gmm_randomly():
         return json.dumps(result)
 
     # params key checking
-    for key in ['tag', 'seq_count']:
+    for key in ['sourceTag', 'targetTag', 'seq_count']:
         if key not in incoming_data:
             logger.error("<%s>, [train gmm randomly] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
-    tag_target = incoming_data['tag']
-    tag_source = incoming_data.get('tag_source', 'init_model')
+    tag_source = incoming_data['sourceTag']
+    tag_target = incoming_data['targetTag']
     seq_count = incoming_data['seq_count']
     covariance = incoming_data.get('covariance', 3600000)
     algo_type = incoming_data.get('algo_type', 'gmm')
@@ -183,6 +183,11 @@ def train_gmm_randomly():
     # Start train model
     poi_configs = dao.query_config()
     models = dao.get_model_by_tag(algo_type, tag_source)
+    if len(models) < 1:
+        logger.info('<%s> [train gmm randomly] sourceTag=%s query empty result'
+                    % (x_request_id, tag_source))
+        result['message'] = 'sourceTag=%s query empty result' % (tag_source)
+        return json.dumps(result)
     for model in models:
         label = model.get('eventLabel')
         if label.find('unknown') != -1 or label.find('others') != -1:  # ignore label `unknown`
