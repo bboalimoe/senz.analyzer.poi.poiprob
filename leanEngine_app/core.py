@@ -89,7 +89,7 @@ def parse_senz_pois(senz_pois_response):
     senz_pois = senz_pois_response[0]
     pois = []
 
-    if "user_place" in senz_pois:
+    if "user_place" in senz_pois and len(senz_pois["user_place"]) > 0:
         user_place = senz_pois['user_place'][0]
         if user_place['tag'] == 'home':
             pois.append('home')
