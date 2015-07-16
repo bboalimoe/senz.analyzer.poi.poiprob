@@ -61,9 +61,12 @@ else:
 
 
 # for POST urls
-POI_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/pois/'
-PLACE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/places/'
-HOME_OFFICE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
+#POI_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/pois/'
+#PLACE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/places/'
+#HOME_OFFICE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
+POI_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/pois/'
+PLACE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/places/'
+HOME_OFFICE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
 
 # TODO: DEFAULT_MAP need read from db
 # poi level1 to level2 map
