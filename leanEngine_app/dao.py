@@ -8,8 +8,25 @@ __all__ = ['query_config']
 from leancloud import Query, Object
 import datetime
 import logging
+import copy
 
 logger = logging.getLogger('logentries')
+
+GMM = Object.extend('gmm')
+
+def _find(query):
+    result = []
+    count = query.count()
+    pages = count/1000 + 1
+    #print count
+    for i in range(pages):
+        _query = copy.deepcopy(query)
+        _query.limit(1000)
+        _query.skip(i * 1000)
+        res = _query.find()
+        for item in res:
+            result.append(item)
+    return result
 
 def query_config(config_name='pois_type'):
     '''
@@ -55,7 +72,6 @@ def save_init_gmm(tag, event_labels, n_components, covariance_type, covars_, mea
     -------
     flag: boolean
     '''
-    GMM = Object.extend('gmm')
     description = 'init save using default params'
     if covariance_type not in ['full', 'diag', 'tied', 'spherical']:
         covariance_type = 'full'
@@ -112,8 +128,6 @@ def save_gmm(tag, event_label, description, params, train_datas, count, n_iter):
     -------
     flag: boolean
     '''
-    GMM = Object.extend('gmm')
-
     gmm = GMM()
     gmm.set('description', str(description))
     gmm.set('eventLabel', event_label)
@@ -145,8 +159,11 @@ def get_model_by_tag(algo_type, tag):
     recent_models_list: list
       list of model objs
     '''
-    result = Query.do_cloud_query('select * from %s where tag="%s"' % (algo_type, tag))
-    results = result.results
+    #TODO: Algo 扔到外面
+    Algo = Object.extend(algo_type)
+    query = Query(Algo)
+    query.equal_to("tag", tag)
+    results = _find(query)
 
     # get most recent models
     models_label_set = set()
@@ -155,6 +172,7 @@ def get_model_by_tag(algo_type, tag):
 
     recent_models_list = []
     for label in models_label_set:
+        #TODO: 性能问题，有时间改
         result = Query.do_cloud_query('select * from %s where tag="%s" and eventLabel="%s" limit 1 order by -updatedAt'
                                       % (algo_type, tag, label))
         results = result.results

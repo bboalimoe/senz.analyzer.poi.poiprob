@@ -1,8 +1,7 @@
 __author__ = 'jiaying.lu'
 
 __all__ = ['APP_ID', 'MASTER_KEY', 'APP_ENV', 'LOGENTRIES_TOKEN', 'BUGSNAG_TOKEN',
-           'POI_URL', 'PLACE_URL', 'HOME_OFFICE_URL']
-
+           'POI_URL', 'PLACE_URL', 'HOME_OFFICE_URL', 'DEFAULT_POI_MAPPING']
 
 import os
 
@@ -40,7 +39,8 @@ elif os.environ.get('LC_APP_PROD') == '0':
 else:
     # dev environ
     APP_ENV = 'local'
-print('-'*20 + '\n|  APP_ENV = %s |\n' %(APP_ENV) + '-'*20)
+
+print('-' * 20 + '\n|  APP_ENV = %s |\n' % (APP_ENV) + '-' * 20)
 if APP_ENV == 'test':
     APP_ID = TEST_APP_ID
     MASTER_KEY = TEST_MASTER_KEY
@@ -57,10 +57,70 @@ elif APP_ENV == 'local':
     LOGENTRIES_TOKEN = LOCAL_LOGENTRIES_TOKEN
     BUGSNAG_TOKEN = LOCAL_BUGSNAG_TOKEN
 else:
-    raise ValueError('Unvalid APP_ENV: %s' %(APP_ENV))
+    raise ValueError('Unvalid APP_ENV: %s' % (APP_ENV))
 
 
 # for POST urls
 POI_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/pois/'
 PLACE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/places/'
 HOME_OFFICE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
+
+# TODO: DEFAULT_MAP need read from db
+# poi level1 to level2 map
+RAW_POI_MAPPING = {
+    'dining': [
+        'chinese_restaurant', 'japan_korea_restaurant', 'western_restaurant', 'bbq', 'chafing_dish', 'seafood',
+        'vegetarian_diet', 'muslim', 'buffet', 'dessert', 'cooler', 'snack_bar',
+    ],
+    'shopping': [
+        'comprehensive_market', 'convenience_store', 'supermarket', 'digital_store', 'pet_market', 'furniture_store',
+        'farmers_market', 'commodity_market', 'flea_market', 'sports_store', 'clothing_store', 'video_store',
+        'glass_store', 'mother_store', 'jewelry_store', 'cosmetics_store', 'gift_store', 'photography_store',
+        'pawnshop', 'antique_store', 'bike_store', 'cigarette_store', 'stationer',
+    ],
+    'life_service': [
+        'travel_agency', 'ticket_agent', 'post_office', 'telecom_offices', 'newstand', 'water_supply_office',
+        'electricity_office', 'photographic_studio', 'laundry', 'talent_market', 'lottery_station', 'housekeeping',
+        'intermediary', 'pet_service', 'salvage_station', 'welfare_house', 'barbershop',
+    ],
+    'entertainment': [
+        'bath_sauna', 'ktv', 'bar', 'coffee', 'night_club', 'cinema', 'odeum', 'resort', 'outdoor', 'game_room',
+        'internet_bar',
+    ],
+    'auto_related': [
+        'gas_station', 'parking_plot', 'auto_sale', 'auto_repair', 'motorcycle', 'car_maintenance', 'car_wash',
+    ],
+    'healthcare': [
+        'hospital', 'clinic', 'emergency_center', 'drugstore',
+    ],
+    'hotel': [
+        'motel', 'hotel', 'economy_hotel', 'guest_house', 'hostel',
+    ],
+    'scenic_spot': ['scenic_spot'
+                    ],
+    'exhibition': [
+        'museum', 'exhibition_hall', 'science_museum', 'library', 'gallery', 'convention_center',
+    ],
+    'education': [
+        'university', 'high_school', 'primary_school', 'kinder_garten', 'training_institutions', 'technical_school',
+        'adult_education',
+    ],
+    'finance': [
+        'bank', 'atm', 'insurance_company', 'security_company',
+    ],
+    'infrastructure': [
+        'traffic', 'public_utilities', 'toll_station', 'other_infrastructure',
+    ],
+    'estate': [
+        'residence', 'business_building'
+    ],
+    'home': ['home'],
+    'office': ['work_office'],
+}
+
+# poi level2 to level1 map
+DEFAULT_POI_MAPPING = {}
+for level1_poi in RAW_POI_MAPPING:
+    for levele2_poi in RAW_POI_MAPPING[level1_poi]:
+        DEFAULT_POI_MAPPING[levele2_poi] = level1_poi
+print('DEFAULT_POI_MAP=\n%s' % (DEFAULT_POI_MAPPING))

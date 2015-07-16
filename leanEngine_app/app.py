@@ -131,10 +131,10 @@ def train_gmm_randomly():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"tag":"random_train", "seq_count":30, "covariance":3600000, "algo_type":"gmm"}
+      e.g. {"sourceTag":"init_model_timestamp", "seq_count":30, "covariance":3600000, "algo_type":"gmm"}
       sourceTag: string
         source model's tag
-      targetTag: string
+      targetTag: string, optional, default 'randomTrain'
         model's tag after train
       seq_count: int
         train sequence length
@@ -168,14 +168,14 @@ def train_gmm_randomly():
         return json.dumps(result)
 
     # params key checking
-    for key in ['sourceTag', 'targetTag', 'seq_count']:
+    for key in ['sourceTag', 'seq_count']:
         if key not in incoming_data:
             logger.error("<%s>, [train gmm randomly] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
     tag_source = incoming_data['sourceTag']
-    tag_target = incoming_data['targetTag']
+    tag_target = incoming_data.get('targetTag', 'randomTrain')
     seq_count = incoming_data['seq_count']
     covariance = incoming_data.get('covariance', 3600000)
     algo_type = incoming_data.get('algo_type', 'gmm')
@@ -382,12 +382,14 @@ def classify_gmm():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"tag":"random_train", "seq":[3600000, 50400000]}
+      e.g. {"tag":"random_train", "seq":[3600000, 50400000], "pois":["home", "ktv"]}
       algo_type: string, optional, default 'gmm'
       tag: string
         model tag
       seq: list
         list of timestamps
+      pois: list
+        list of poi labels
 
     Returns
     -------
@@ -415,7 +417,7 @@ def classify_gmm():
         return json.dumps(result)
 
     # params key checking
-    for key in ['tag', 'seq']:
+    for key in ['tag', 'seq', 'pois']:
         if key not in incoming_data:
             logger.error("<%s>, [classify gmm] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
@@ -488,54 +490,34 @@ def location2poiprob():
     logger.info('<%s>, [location2poiprob] poi_url=%s, request=%s, response=%s'
                 % (x_request_id, POI_URL, poi_request, poi_results))
 
-    # request senz.datasource.poi:/senz/activities/home_office_status/
-    home_office_results = []
-    for geo_point in user_trace:
-        # Only when it's weekday need request
-        if arrow.get(geo_point['timestamp']/1000).isoweekday() > 5:
-            logger.info('<%s>, [location2poiprob] timestamp=%s not in weekday' % (x_request_id, geo_point['timestamp']))
-            home_office_request.append({})
-            continue
+    # parse poi_results
+    # TODO: 查看权重是否配对了
+    pois = core.parse_senz_pois(poi_results)
 
-        home_office_request = {'userId': user_id, 'dev_key': dev_key, 'timestamp': geo_point['timestamp'],
-                            'geo_point': {'latitude': geo_point['location']['latitude'],
-                                          'longitude': geo_point['location']['longitude']}}
-        logger.debug('request: %s' % (json.dumps(home_office_request)))
-        home_office_response = requests.post(HOME_OFFICE_URL, data=json.dumps(home_office_request))
-        if home_office_response.status_code != 200:
-            logger.error('<%s>, [location2poiprob] Request home_office encounter %s Server Error, url=%s, request=%s'
-                         % (x_request_id, home_office_response.status_code, HOME_OFFICE_URL, home_office_request))
-            result['message'] = 'Request home_office encounter %s Server Error' % (home_office_response.status_code)
-            return json.dumps(result)
-        home_office_result = home_office_response.json()['results']['home_office_status']
-        logger.info('<%s>, [location2poiprob] home_office_url=%s, request=%s, response=%s'
-                    % (x_request_id, HOME_OFFICE_URL, home_office_request, home_office_result))
-        home_office_results.append(home_office_result)
 
     # request self:/classify/
     seq = [e['timestamp'] for e in user_trace]
-    classify_request = {'tag': 'randomTrainTrial', 'seq': seq}
+    classify_request = {'tag': 'randomTrain', 'seq': seq, 'pois': pois}  # TODO: 每次从哪种tag中取, 比如从最近有更新的地方
     classify_results = core.do_classify(classify_request, x_request_id)['result']
     logger.info('<%s>, [location2poiprob] classify request=%s, response=%s'
                 % (x_request_id, classify_request, classify_results))
 
-    # add home office status into poi prob
-    poiprob_results = []
-    for index in xrange(len(poi_results)):
-        if home_office_results[index]:
-            # 如果home_office_status有结果，则给该status 0.5的权重
-            poiprob_result = dict([(key, value/2.0) for (key, value) in classify_results[index].iteritems()])
-            if home_office_results[index]['at_place']['tag'] == 'home':
-                poiprob_result['poi#home'] += 0.5
-            if home_office_results[index]['at_place']['tag'] == 'office':
-                poiprob_result['poi#work_office'] += 0.5
-            poiprob_results.append(poiprob_result)
-        else:
-            poiprob_results.append(classify_results[index])
+    # poiprob_results map with `DEFAULT_POI_MAPPING`
+    map_poiprob_results = []
+    for poiprob_result in classify_results:
+        map_poiprob_result = {}
+        for level2_poi, poiprob in poiprob_result.iteritems():
+            level1_poi = DEFAULT_POI_MAPPING[level2_poi]
+            if level1_poi not in map_poiprob_result:
+                map_poiprob_result[level1_poi] = {'level1_prob': 0.0, 'level2_prob': {}}
+            map_poiprob_result[level1_poi]['level1_prob'] += poiprob
+            map_poiprob_result[level1_poi]['level2_prob'][level2_poi] = poiprob
+        map_poiprob_results.append(map_poiprob_result)
 
     # combine all results
     result['code'] = 0
     result['message'] = 'success'
-    result['results'] = {'pois': poi_results, 'poiprob': poiprob_results}
+    result['results'] = {'pois': poi_results, 'poi_probability': map_poiprob_results}
 
     return json.dumps(result)
+

@@ -16,15 +16,20 @@ def do_classify(incoming_data, x_request_id):
 
     tag = incoming_data['tag']
     seq = incoming_data['seq']
+    pois = incoming_data['pois']
     algo_type = incoming_data.get('algo_type', 'gmm')
     logger.info('<%s>, [classify gmm] params: tag=%s, seq=%s, algo_type=%s' %(x_request_id, tag, seq, algo_type))
 
     # classify
-    models = dao.get_model_by_tag(algo_type, tag)
-    if not models:
-        result['message'] = "There's no model's tag=%s" % (tag)
-        logger.info('<%s>, [classify] request not exist model tag=%s' % (x_request_id, tag))
-        return result
+    models = []
+    for poi in pois:
+        try:
+            model = dao.get_model_by_tag_lable(algo_type, tag, poi)
+        except IndexError:
+            logger.error('tag=%s, label=%s can not find model' % (tag, poi))
+            result['message'] = '<%s>, [do_classify] tag=%s, label=%s can not find model' % (x_request_id ,tag, poi)
+            return result
+        models.append(model)
 
     _models = []
     labels = []
@@ -61,3 +66,40 @@ def do_classify(incoming_data, x_request_id):
     result['result'] = score_results
 
     return result
+
+
+def parse_senz_pois(senz_pois_response):
+    '''解析 /senz/pois/ 返回的结果，取得其中的mapping_type
+
+    特别地，如果结果中含有home&office，也加入到pois
+
+    Parameters
+    -----
+    senz_pois_response: list of dict
+      e.g. dict: {"pois":[{"type": {"mapping_type":"AA"} }, {"type": {"mapping_type":"BB"} }],
+                  "user_place": [{"tag":"home"}]
+                 }
+      parser_pois存储各类poi信息，user_place存储home&office信息
+
+    Returns
+    -----
+    pois_list: list
+      list of string
+    '''
+    senz_pois = senz_pois_response[0]
+    pois = []
+
+    if "user_place" in senz_pois:
+        user_place = senz_pois['user_place'][0]
+        if user_place['tag'] == 'home':
+            pois.append('home')
+        if user_place['tag'] == 'office':
+            pois.append('work_office')
+
+    for parse_pois in senz_pois['pois']:
+        poi = parse_pois['type']['mapping_type']
+        if poi in ['unknown', 'others', 'unkown']:
+            continue
+        pois.append(poi)
+
+    return pois
