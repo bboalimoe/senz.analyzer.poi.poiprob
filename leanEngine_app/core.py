@@ -7,6 +7,7 @@ logger = logging.getLogger('logentries')
 
 import dao
 from poi_analyser_lib.predictor import Predictor
+import util
 
 def do_classify(incoming_data, x_request_id):
     '''wrapper of classify
@@ -20,6 +21,9 @@ def do_classify(incoming_data, x_request_id):
     algo_type = incoming_data.get('algo_type', 'gmm')
     logger.info('<%s>, [classify gmm] params: tag=%s, seq=%s, algo_type=%s' %(x_request_id, tag, seq, algo_type))
 
+    # parse seq
+    seq = [util.parse_timestamp(e) for e in seq]
+
     # classify
     models = []
     for poi in pois:
@@ -27,8 +31,8 @@ def do_classify(incoming_data, x_request_id):
             model = dao.get_model_by_tag_lable(algo_type, tag, poi)
         except IndexError:
             logger.error('tag=%s, label=%s can not find model' % (tag, poi))
-            result['message'] = '<%s>, [do_classify] tag=%s, label=%s can not find model' % (x_request_id ,tag, poi)
-            return result
+            result['message'] = '<%s>, [do_classify] Can not find model whose tag=%s, label=%s ' % (x_request_id ,tag, poi)
+            raise ValueError(result['message'])
         models.append(model)
 
     _models = []
@@ -44,14 +48,20 @@ def do_classify(incoming_data, x_request_id):
         }
         _models.append(_model)
     my_predictor = Predictor(_models)
+    logger.debug('-------\n\n_models:\n %s\n' % (_models))
 
     score_results = []
     seq_scores = my_predictor.scores(seq)
+    logger.debug('seq_scores: %s' % (seq_scores))
     for scores in seq_scores:
         score_result = {}
         for index, score in enumerate(scores):
-            score_result[labels[index]] = score
+            if labels[index] in score_result:
+                score_result[labels[index]] += score
+            else:
+                score_result[labels[index]] = score
         score_results.append(score_result)
+    logger.debug('!!!!!! score_result:%s' %(score_result))
     # store seq in db
     for index, timestamp in enumerate(seq):
         event_label = max(score_results[index].iterkeys(), key=lambda key: score_results[index][key])  # max prob key is labelt
@@ -103,3 +113,4 @@ def parse_senz_pois(senz_pois_response):
         pois.append(poi)
 
     return pois
+

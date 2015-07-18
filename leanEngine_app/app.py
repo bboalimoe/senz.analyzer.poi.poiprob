@@ -7,11 +7,11 @@ __all__ = ['app']
 
 import os
 import json
-from flask import Flask, request
+from flask import Flask, request, make_response
 import datetime
 import arrow
 import dao
-import core
+import core, util
 from config import *
 from poi_analyser_lib.trainer import Trainer
 
@@ -104,7 +104,8 @@ def create_init_gmm():
     except ValueError, err_msg:
         logger.exception('<%s>, [create gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
         result['message'] = 'Unvalid params: NOT a JSON Object'
-        return json.dumps(result)
+        result['code'] = 103
+        return make_response(json.dumps(result), 400)
 
     # params key checking
     covariance_value = incoming_data.get('covariance_value', 1.0)
@@ -131,13 +132,11 @@ def train_gmm_randomly():
     Parameters
     ---------
     data: JSON Obj
-      e.g. {"sourceTag":"init_model_timestamp", "seq_count":30, "covariance":3600000, "algo_type":"gmm"}
+      e.g. {"sourceTag":"init_model_timestamp", "covariance":3600000, "algo_type":"gmm"}
       sourceTag: string
         source model's tag
       targetTag: string, optional, default 'randomTrain'
         model's tag after train
-      seq_count: int
-        train sequence length
       covariance: float, optional, default 1000 * 60 * 60 (1 hour)
         sequence covariance. And seq means are from `config` table
       algo_type: string, optional, default 'gmm'
@@ -165,28 +164,29 @@ def train_gmm_randomly():
     except ValueError, err_msg:
         logger.exception('<%s>, [train gmm randomly] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
         result['message'] = 'Unvalid params: NOT a JSON Object'
-        return json.dumps(result)
+        result['code'] = 103
+        return make_response(json.dumps(result), 400)
 
     # params key checking
-    for key in ['sourceTag', 'seq_count']:
+    for key in ['sourceTag']:
         if key not in incoming_data:
             logger.error("<%s>, [train gmm randomly] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
-            return json.dumps(result)
+            result['code'] = 103
+            return make_response(json.dumps(result), 400)
 
-    tag_source = incoming_data['sourceTag']
-    tag_target = incoming_data.get('targetTag', 'randomTrain')
-    seq_count = incoming_data['seq_count']
+    source_tag = incoming_data['sourceTag']
+    target_tag = incoming_data.get('targetTag', 'randomTrain')
     covariance = incoming_data.get('covariance', 3600000)
     algo_type = incoming_data.get('algo_type', 'gmm')
 
     # Start train model
     poi_configs = dao.query_config()
-    models = dao.get_model_by_tag(algo_type, tag_source)
+    models = dao.get_model_by_tag(algo_type, source_tag)
     if len(models) < 1:
         logger.info('<%s> [train gmm randomly] sourceTag=%s query empty result'
-                    % (x_request_id, tag_source))
-        result['message'] = 'sourceTag=%s query empty result' % (tag_source)
+                    % (x_request_id, source_tag))
+        result['message'] = 'sourceTag=%s query empty result' % (source_tag)
         return json.dumps(result)
     for model in models:
         label = model.get('eventLabel')
@@ -201,9 +201,11 @@ def train_gmm_randomly():
             'params': model.get('params'),
         }
         my_trainer = Trainer(_model)
+        # TODO: do this in db, not in code
+        seq_count = poi_configs[label]['count'] * 10   # read from db, need > 24 n_component
         my_trainer.trainRandomly(poi_configs[label]['initMeans'], seq_count, covariance)
-        dao.save_gmm(tag_target, label, model.get('params'), my_trainer.modelParams(), '', model.get('count')+seq_count,
-                     model.get('nIter'))
+        dao.save_gmm(target_tag, label, model.get('params'), my_trainer.modelParams(), '',
+                     model.get('count')+seq_count, model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
     logger.info('<%s>, [train gmm randomly] success' % (x_request_id))
@@ -436,6 +438,7 @@ def location2poiprob():
     ---------
     data: JSON Obj
       userId: string
+        current please use `senz`
       user_trace: list
       dev_key: string
 
@@ -462,20 +465,28 @@ def location2poiprob():
     except ValueError, err_msg:
         logger.exception('<%s>, [location2poiprob] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
         result['message'] = 'Unvalid params: NOT a JSON Object'
-        return json.dumps(result)
+        result['code'] = 103
+        return make_response(json.dumps(result), 400)
 
     # params key checking
     for key in ['userId', 'user_trace', 'dev_key']:
         if key not in incoming_data:
             logger.error("<%s>, [location2poiprob] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
-            return json.dumps(result)
+            result['code'] = 103
+            return make_response(json.dumps(result), 400)
 
     user_id = incoming_data['userId']
     user_trace = incoming_data['user_trace']
     dev_key = incoming_data['dev_key']
     logger.info('<%s>, [location2poiprob] params: userId=%s, user_trace=%s, dev_key=%s'
                 % (x_request_id, user_id, user_trace, dev_key))
+
+    # validate user_trace
+    if not util.validate_user_trace(user_trace):
+        result['message'] = "Unvalid user_trace: %s" % (user_trace)
+        result['code'] = 103
+        return make_response(json.dumps(result), 400)
 
     # request senz.datasource.poi:/senz/poi/
     poi_request = {'userId': user_id, 'dev_key': dev_key, 'locations': user_trace}
@@ -484,21 +495,29 @@ def location2poiprob():
         logger.error('<%s>, [location2poiprob] Request poi encounter %s Server Error, url=%s, request=%s'
                      % (x_request_id, poi_response.status_code, POI_URL, poi_request))
         result['message'] = 'Request poi encounter %s Server Error' % (poi_response.status_code)
-        return json.dumps(result)
+        result['code'] = 302
+        return make_response(json.dumps(result), 500)
     poi_results = poi_response.json()
     poi_results = poi_results['results']['parse_poi']
     logger.info('<%s>, [location2poiprob] poi_url=%s, request=%s, response=%s'
                 % (x_request_id, POI_URL, poi_request, poi_results))
 
     # parse poi_results
-    # TODO: 查看权重是否配对了
     pois = core.parse_senz_pois(poi_results)
+    if len(pois) == 0:
+        result['message'] = "Pois = NULL, Please check request params"
+        result['code'] = 102
+        return make_response(json.dumps(result), 500)
 
 
     # request self:/classify/
     seq = [e['timestamp'] for e in user_trace]
     classify_request = {'tag': 'randomTrain', 'seq': seq, 'pois': pois}  # TODO: 每次从哪种tag中取, 比如从最近有更新的地方
-    classify_results = core.do_classify(classify_request, x_request_id)['result']
+    try:
+        classify_results = core.do_classify(classify_request, x_request_id)['result']
+    except ValueError, err:
+        result['message'] = err.message
+        return make_response(json.dumps(result), 500)
     logger.info('<%s>, [location2poiprob] classify request=%s, response=%s'
                 % (x_request_id, classify_request, classify_results))
 
