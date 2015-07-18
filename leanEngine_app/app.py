@@ -4,24 +4,25 @@ __author__ = 'jiaying.lu'
 
 __all__ = ['app']
 
-
 import os
 import json
-from flask import Flask, request, make_response
 import datetime
+import logging
+
+from flask import Flask, request, make_response
 import arrow
+from logentries import LogentriesHandler
+import bugsnag
+from bugsnag.flask import handle_exceptions
+import requests
+
 import dao
-import core, util
+import core
+import util
 from config import *
 from poi_analyser_lib.trainer import Trainer
 
-import logging
-from logentries import LogentriesHandler
 
-import bugsnag
-from bugsnag.flask import handle_exceptions
-
-import requests
 
 
 # Configure Logentries
