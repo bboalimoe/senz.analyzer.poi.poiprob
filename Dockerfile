@@ -55,8 +55,7 @@ WORKDIR /app
 RUN mkdir ./leanEngine_app
 
 ADD leanEngine_app ./leanEngine_app
+ADD supervisor.conf /etc/supervisor/conf.d/
 RUN pip install -i http://pypi.douban.com/simple/ -r ./leanEngine_app/requirements.txt
-
-#CMD python leanEngine_app/wsgi.py >/dev/null 2>&1 &
 
 EXPOSE 9010
