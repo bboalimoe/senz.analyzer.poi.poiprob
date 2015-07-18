@@ -16,5 +16,5 @@ application = leancloud.Engine(app)
 if __name__ == '__main__':
     # 只在本地开发环境执行的代码
     app.debug = True
-    server = simple_server.make_server('0.0.0.0', 13420, application)
+    server = simple_server.make_server('0.0.0.0', 9010, application)
     server.serve_forever()
