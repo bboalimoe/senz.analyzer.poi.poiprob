@@ -30,6 +30,8 @@ TEST_BUGSNAG_TOKEN = '8d89ec939c4b02920f0c6696fad7256f'
 PROD_BUGSNAG_TOKEN = '712e8dc9619eea3532c761830a64d9fb'
 
 # Choose keys according to APP_ENV
+'''
+# for leanEngine
 if os.environ.get('LC_APP_PROD') == '1':
     # prod environ
     APP_ENV = 'prod'
@@ -39,6 +41,13 @@ elif os.environ.get('LC_APP_PROD') == '0':
 else:
     # dev environ
     APP_ENV = 'local'
+'''
+try:
+    APP_ENV = os.environ["APP_ENV"]
+except KeyError, key:
+    print "KeyError: There is no env var named %s" % key
+    print "The local env will be applied"
+    APP_ENV = "local"
 
 print('-' * 20 + '\n|  APP_ENV = %s |\n' % (APP_ENV) + '-' * 20)
 if APP_ENV == 'test':
