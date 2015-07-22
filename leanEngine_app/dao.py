@@ -201,7 +201,12 @@ def get_model_by_tag_lable(algo_type, tag, label):
     result = Query.do_cloud_query('select * from %s where tag="%s" and eventLabel="%s" limit 1 order by -updatedAt'
                                   % (algo_type, tag, label))
     results = result.results
-    recent_model = results[0]
+    try:
+        recent_model = results[0]
+    except IndexError, e:
+        logger.exception('[get_model_by_tag_label] algo_type=%s, tag=%s, label=%s\n err_msg=%s'
+                         % (algo_type, tag, label, str(e)))
+        raise IndexError('[IndexError] from func - get_model_by_tag_label, err_msg=%s' % (str(e)))
 
     return recent_model
 

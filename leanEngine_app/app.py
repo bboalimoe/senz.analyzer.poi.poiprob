@@ -23,8 +23,6 @@ from config import *
 from poi_analyser_lib.trainer import Trainer
 
 
-
-
 # Configure Logentries
 logger = logging.getLogger('logentries')
 if APP_ENV == 'prod':
@@ -93,7 +91,8 @@ def create_init_gmm():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [create gmm] enter' %(x_request_id))
+    logger.info('<%s>, [create gmm] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                 request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
@@ -104,7 +103,7 @@ def create_init_gmm():
             incoming_data = {}
     except ValueError, err_msg:
         logger.exception('<%s>, [create gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
+        result['message'] = 'Invalid params: NOT a JSON Object'
         result['code'] = 103
         return make_response(json.dumps(result), 400)
 
@@ -123,6 +122,7 @@ def create_init_gmm():
 
     dao.save_init_gmm(tag, poi_configs.keys(), n_components, covariance_type, covars_, means_)
 
+    logger.info('<%s>, [create gmm] Success! Valid request with params=%s' %(x_request_id, incoming_data))
     result = {'code': 0, 'message': 'success'}
     return json.dumps(result)
 
@@ -156,7 +156,8 @@ def train_gmm_randomly():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [train gmm randomly] enter' %(x_request_id))
+    logger.info('<%s>, [train gmm randomly] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                         request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
@@ -164,7 +165,7 @@ def train_gmm_randomly():
         incoming_data = json.loads(request.data)
     except ValueError, err_msg:
         logger.exception('<%s>, [train gmm randomly] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
+        result['message'] = 'Invalid params: NOT a JSON Object'
         result['code'] = 103
         return make_response(json.dumps(result), 400)
 
@@ -176,6 +177,8 @@ def train_gmm_randomly():
             result['code'] = 103
             return make_response(json.dumps(result), 400)
 
+    logger.info("<%s>, [train gmm randomly] valid params:%s" % (x_request_id, incoming_data))
+
     source_tag = incoming_data['sourceTag']
     target_tag = incoming_data.get('targetTag', 'randomTrain')
     covariance = incoming_data.get('covariance', 3600000)
@@ -185,15 +188,16 @@ def train_gmm_randomly():
     poi_configs = dao.query_config()
     models = dao.get_model_by_tag(algo_type, source_tag)
     if len(models) < 1:
-        logger.info('<%s> [train gmm randomly] sourceTag=%s query empty result'
+        logger.error('<%s> [train gmm randomly] sourceTag=%s query empty result'
                     % (x_request_id, source_tag))
         result['message'] = 'sourceTag=%s query empty result' % (source_tag)
-        return json.dumps(result)
+        result['code'] = 102
+        return make_response(json.dumps(result), 400)
     for model in models:
         label = model.get('eventLabel')
         if label.find('unknown') != -1 or label.find('others') != -1:  # ignore label `unknown`
             continue
-        logger.info('<%s>, [train randomly] start train label=%s model' % (x_request_id, label))
+        logger.debug('<%s>, [train randomly] start train label=%s model' % (x_request_id, label))
         _model = {
             'nMix': model.get('nMix'),
             'covarianceType': model.get('covarianceType'),
@@ -209,7 +213,7 @@ def train_gmm_randomly():
                      model.get('count')+seq_count, model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
-    logger.info('<%s>, [train gmm randomly] success' % (x_request_id))
+    logger.info('<%s>, [train gmm randomly] Success. Train %s models' % (x_request_id, len(models)))
     return json.dumps(result)
 
 
@@ -245,23 +249,28 @@ def train_gmm_with_seqs():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [train gmm] enter' %(x_request_id))
+    logger.info('<%s>, [train gmm with seq] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                         request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
     try:
         incoming_data = json.loads(request.data)
     except ValueError, err_msg:
-        logger.exception('<%s>, [train gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
-        return json.dumps(result)
+        logger.exception('<%s>, [train gmm with seq] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
+        result['message'] = 'Invalid params: NOT a JSON Object'
+        result['code'] = 103
+        return make_response(json.dumps(result), 400)
 
     # params key checking
     for key in ['tag', 'poi_label', 'seq', 'description']:
         if key not in incoming_data:
-            logger.error("<%s>, [train gmm] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
+            logger.error("<%s>, [train gmm with seq] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
-            return json.dumps(result)
+            result['code'] = 103
+            return make_response(json.dumps(result), 400)
+
+    logger.info('<%s>, [train gmm with seq] valid params:%s' % (x_request_id, incoming_data))
 
     tag = incoming_data['tag']
     label = incoming_data['poi_label']
@@ -269,7 +278,15 @@ def train_gmm_with_seqs():
     description = incoming_data['description']
     algo_type = incoming_data.get('algo_type', 'gmm')
 
-    model = dao.get_model_by_tag_lable(algo_type, tag, label)
+    try:
+        model = dao.get_model_by_tag_lable(algo_type, tag, label)
+    except IndexError, e:
+        logger.exception('<%s>, [train gmm with seq] Maybe not find model by input algo_type=%s, tag=%s, label=%s\n err_msg=%s'
+                         % (x_request_id, algo_type, tag, label, str(e)))
+        result['code'] = 102
+        result['message'] = 'Maybe not find model by input params, err_msg=%s' % (str(e))
+        return make_response(json.dumps(result), 500)
+
     description += '\n last params: %s' % (model.get('params'))  # store last params in description
     _model = {
         'nMix': model.get('nMix'),
@@ -283,8 +300,7 @@ def train_gmm_with_seqs():
     dao.save_gmm('random_train', label, description, my_trainer.modelParams(), seq, model.get('count')+len(seq),
                  model.get('nIter'))
     result = {'code': 0, 'message': 'success'}
-    logger.info('<%s>, [train gmm] success' % (x_request_id))
-    logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
+    logger.info('<%s>, [train gmm with seq] success! last params: %s\t train data: %s\t current params: %s'
                 % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
     return json.dumps(result)
 
@@ -321,23 +337,26 @@ def train_gmm():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [train gmm] enter' %(x_request_id))
+    logger.info('<%s>, [train gmm use db data] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
     try:
         incoming_data = json.loads(request.data)
     except ValueError, err_msg:
-        logger.exception('<%s>, [train gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
+        logger.exception('<%s>, [train gmm use db data] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
+        result['message'] = 'Invalid params: NOT a JSON Object'
         return json.dumps(result)
 
     # params key checking
     for key in ['tag', 'poi_label', 'description']:
         if key not in incoming_data:
-            logger.error("<%s>, [train gmm] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
+            logger.error("<%s>, [train gmm use db data] [KeyError] params=%s, should have key: %s" % (x_request_id, incoming_data, key))
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
+
+    logger.info('<%s>, [train gmm use db data] valid params:%s' % (x_request_id, incoming_data))
 
     tag = incoming_data['tag']
     label = incoming_data['poi_label']
@@ -364,8 +383,7 @@ def train_gmm():
         dao.save_gmm('random_train', label, description, my_trainer.modelParams(), seq, model.get('count')+len(seq),
                      model.get('nIter'))
         result = {'code': 0, 'message': 'success'}
-        logger.info('<%s>, [train gmm] success' % (x_request_id))
-        logger.info('<%s>, [train gmm data] last params: %s\t train data: %s\t current params: %s'
+        logger.info('<%s>, [train gmm use db data] success! last params: %s\t train data: %s\t current params: %s'
                     % (x_request_id, model.get('params'), seq, my_trainer.modelParams()))
         poi_datas_ids = []
         for elem in poi_datas:
@@ -408,7 +426,8 @@ def classify_gmm():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [classify gmm] enter' %(x_request_id))
+    logger.info('<%s>, [classify gmm] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                       request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
@@ -416,7 +435,7 @@ def classify_gmm():
         incoming_data = json.loads(request.data)
     except ValueError, err_msg:
         logger.exception('<%s>, [classify gmm] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
+        result['message'] = 'Invalid params: NOT a JSON Object'
         return json.dumps(result)
 
     # params key checking
@@ -426,7 +445,10 @@ def classify_gmm():
             result['message'] = "Params content Error: can't find key=%s" % (key)
             return json.dumps(result)
 
+    logger.info("<%s>, [classify gmm] valid request with params=%s" % (x_request_id, incoming_data))
+
     result = core.do_classify(incoming_data, x_request_id)
+    logger.info("<%s>, [classify gmm] success! request data=%s" % (x_request_id, incoming_data))
 
     return json.dumps(result)
 
@@ -457,7 +479,8 @@ def location2poiprob():
     else:
         x_request_id = ''
 
-    logger.info('<%s>, [location2poiprob] enter' %(x_request_id))
+    logger.info('<%s>, [location2poiprob] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
+                                                                       request.remote_user))
     result = {'code': 1, 'message': ''}
 
     # params JSON validate
@@ -465,7 +488,7 @@ def location2poiprob():
         incoming_data = json.loads(request.data)
     except ValueError, err_msg:
         logger.exception('<%s>, [location2poiprob] [ValueError] err_msg: %s, params=%s' % (x_request_id, err_msg, request.data))
-        result['message'] = 'Unvalid params: NOT a JSON Object'
+        result['message'] = 'Invalid params: NOT a JSON Object'
         result['code'] = 103
         return make_response(json.dumps(result), 400)
 
@@ -477,21 +500,22 @@ def location2poiprob():
             result['code'] = 103
             return make_response(json.dumps(result), 400)
 
-    user_id = incoming_data['userId']
-    user_trace = incoming_data['user_trace']
-    dev_key = incoming_data['dev_key']
-    logger.info('<%s>, [location2poiprob] params: userId=%s, user_trace=%s, dev_key=%s'
-                % (x_request_id, user_id, user_trace, dev_key))
-
     # validate user_trace
-    if not util.validate_user_trace(user_trace):
-        result['message'] = "Unvalid user_trace: %s" % (user_trace)
+    if not util.validate_user_trace(incoming_data['user_trace']):
+        result['message'] = "Invalid user_trace: %s" % (incoming_data['user_trace'])
         result['code'] = 103
         return make_response(json.dumps(result), 400)
 
-    # request senz.datasource.poi:/senz/poi/
+    user_id = incoming_data['userId']
+    user_trace = incoming_data['user_trace']
+    dev_key = incoming_data['dev_key']
+    logger.info('<%s>, [location2poiprob] valid params: userId=%s, user_trace=%s, dev_key=%s'
+                % (x_request_id, user_id, user_trace, dev_key))
+
+    # request senz.parserhub.poi:/pois/
     poi_request = {'userId': user_id, 'dev_key': dev_key, 'locations': user_trace}
-    poi_response = requests.post(POI_URL, data=json.dumps(poi_request))
+    headers = {'X-senz-Auth': POI_AUTH_KEY}
+    poi_response = requests.post(POI_URL, data=json.dumps(poi_request), headers=headers)
     if poi_response.status_code != 200:
         logger.error('<%s>, [location2poiprob] Request poi encounter %s Server Error, url=%s, request=%s'
                      % (x_request_id, poi_response.status_code, POI_URL, poi_request))
@@ -538,6 +562,8 @@ def location2poiprob():
     result['code'] = 0
     result['message'] = 'success'
     result['results'] = {'pois': poi_results, 'poi_probability': map_poiprob_results}
+    logger.info('<%s>, [location2poiprob] success. len(pois)=%s, len(poi_probability)=%s'
+                % (x_request_id, result['results']['pois'], result['results']['poi_probability']))
 
     return json.dumps(result)
 

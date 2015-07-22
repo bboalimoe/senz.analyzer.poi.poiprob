@@ -1,7 +1,7 @@
 __author__ = 'jiaying.lu'
 
 __all__ = ['APP_ID', 'MASTER_KEY', 'APP_ENV', 'LOGENTRIES_TOKEN', 'BUGSNAG_TOKEN',
-           'POI_URL', 'PLACE_URL', 'HOME_OFFICE_URL', 'DEFAULT_POI_MAPPING']
+           'POI_URL', 'PLACE_URL', 'HOME_OFFICE_URL', 'DEFAULT_POI_MAPPING', 'POI_AUTH_KEY']
 
 import os
 
@@ -70,12 +70,12 @@ else:
 
 
 # for POST urls
-#POI_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/pois/'
-#PLACE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/places/'
-#HOME_OFFICE_URL = 'http://senz-test-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
 POI_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/pois/'
+#POI_URL = 'http://api.trysenz.com/productivity/parserhub/pois/'
 PLACE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/places/'
 HOME_OFFICE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
+
+POI_AUTH_KEY = '5548eb2ade57fc001b000001b2ecfb11a7f94cc76678c7c18e123361'
 
 # TODO: DEFAULT_MAP need read from db
 # poi level1 to level2 map
