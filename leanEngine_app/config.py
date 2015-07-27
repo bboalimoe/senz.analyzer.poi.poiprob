@@ -70,8 +70,8 @@ else:
 
 
 # for POST urls
-POI_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/pois/'
-#POI_URL = 'http://api.trysenz.com/productivity/parserhub/pois/'
+#POI_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/pois/'
+POI_URL = 'http://api.trysenz.com/productivity/parserhub/pois/'
 PLACE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/places/'
 HOME_OFFICE_URL = 'http://senz-senz-datasource-poi.daoapp.io/senz/activities/home_office_status/'
 
