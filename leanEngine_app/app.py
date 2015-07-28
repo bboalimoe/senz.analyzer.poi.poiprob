@@ -15,6 +15,7 @@ from logentries import LogentriesHandler
 import bugsnag
 from bugsnag.flask import handle_exceptions
 import requests
+import gevent
 
 import dao
 import core
@@ -209,6 +210,7 @@ def train_gmm_randomly():
         # TODO: do this in db, not in code
         seq_count = poi_configs[label]['count'] * 10   # read from db, need > 24 n_component
         my_trainer.trainRandomly(poi_configs[label]['initMeans'], seq_count, covariance)
+        # TODO: use gevent to process in async way
         dao.save_gmm(target_tag, label, model.get('params'), my_trainer.modelParams(), '',
                      model.get('count')+seq_count, model.get('nIter'))
 
@@ -512,12 +514,31 @@ def location2poiprob():
     logger.info('<%s>, [location2poiprob] valid params: userId=%s, user_trace=%s, dev_key=%s'
                 % (x_request_id, user_id, user_trace, dev_key))
 
-    # request senz.parserhub.poi:/pois/
+    # async request senz.datasource.poi:/senz/places/, for data record
+    places_request = {'userId': user_id, 'dev_key': dev_key, 'locations': user_trace}
+    places_greenlet = gevent.spawn(requests.post, PLACE_URL, data=json.dumps(places_request))
+
+    # async request senz.parserhub.poi:/pois/
     poi_request = {'userId': user_id, 'dev_key': dev_key, 'locations': user_trace}
     headers = {'X-senz-Auth': POI_AUTH_KEY}
-    poi_response = requests.post(POI_URL, data=json.dumps(poi_request), headers=headers)
-    if poi_response.status_code != 200:
-        logger.error('<%s>, [location2poiprob] Request poi encounter %s Server Error, url=%s, request=%s'
+    poi_greenlet = gevent.spawn(requests.post, POI_URL, data=json.dumps(poi_request), headers=headers)
+    #kpoi_response = requests.post(POI_URL, data=json.dumps(poi_request), headers=headers)
+
+    gevent.joinall([places_greenlet, poi_greenlet])
+    places_response = places_greenlet.value
+    poi_response = poi_greenlet.value
+
+    # process places response
+    if places_response.status_code in [200, 201]:
+        logger.info('<%s>, [location2poiprob] Request `places` success, url=%s, request=%s, response=%s'
+                    % (x_request_id, PLACE_URL, places_request, places_response.json()))
+    else:
+        logger.info('<%s>, [location2poiprob] Request `places` encounter %s error, url=%s, request=%s'
+                    % (x_request_id, places_response.status_code, PLACE_URL, places_request))
+
+    # process poi response
+    if poi_response.status_code not in [200, 201]:
+        logger.error('<%s>, [location2poiprob] Request `poi` encounter %s Server Error, url=%s, request=%s'
                      % (x_request_id, poi_response.status_code, POI_URL, poi_request))
         result['message'] = 'Request poi encounter %s Server Error' % (poi_response.status_code)
         result['code'] = 302

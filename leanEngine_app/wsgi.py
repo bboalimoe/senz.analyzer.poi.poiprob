@@ -6,7 +6,9 @@ from wsgiref import simple_server
 
 from config import *
 from app import app
+from gevent import monkey
 
+monkey.patch_all()
 
 leancloud.init(APP_ID, master_key=MASTER_KEY)
 

@@ -9,6 +9,7 @@ from leancloud import Query, Object
 import datetime
 import logging
 import copy
+import gevent
 
 logger = logging.getLogger('logentries')
 
@@ -159,6 +160,14 @@ def get_model_by_tag(algo_type, tag):
     recent_models_list: list
       list of model objs
     '''
+    def async_get_model_by_tag_once(algo_type, model_tag, label):
+        '''func for gevent
+        '''
+        result = Query.do_cloud_query('select * from %s where tag="%s" and eventLabel="%s" limit 1 order by -updatedAt'
+                                      % (algo_type, model_tag, label))
+        results = result.results
+        return results[0]
+
     #TODO: Algo 扔到外面
     Algo = Object.extend(algo_type)
     query = Query(Algo)
@@ -170,14 +179,12 @@ def get_model_by_tag(algo_type, tag):
     for model in results:
         models_label_set.add(model.get('eventLabel'))
 
-    recent_models_list = []
+    threads = []
     for label in models_label_set:
-        #TODO: 性能问题，有时间改
-        result = Query.do_cloud_query('select * from %s where tag="%s" and eventLabel="%s" limit 1 order by -updatedAt'
-                                      % (algo_type, tag, label))
-        results = result.results
-        recent_models_list.append(results[0])
+        threads.append(gevent.spawn(async_get_model_by_tag_once, algo_type, tag, label))
+    gevent.joinall(threads)
 
+    recent_models_list = [thread.value for thread in threads]
     return recent_models_list
 
 
