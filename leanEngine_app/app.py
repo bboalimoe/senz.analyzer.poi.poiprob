@@ -214,7 +214,7 @@ def train_gmm_randomly():
         seq_count = poi_configs[label]['count'] * 10   # read from db, need > 24 n_component
         my_trainer.trainRandomly(poi_configs[label]['initMeans'], seq_count, covariance)
         # TODO: use gevent to process in async way
-        dao.save_gmm(target_tag, label, model.get('params'), my_trainer.modelParams(), '',
+        dao.save_gmm(target_tag, label, description, my_trainer.modelParams(), '',
                      model.get('count')+seq_count, model.get('nIter'))
 
     result = {'code': 0, 'message': 'success'}
