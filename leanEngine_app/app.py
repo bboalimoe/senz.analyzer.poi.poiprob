@@ -138,10 +138,12 @@ def train_gmm_randomly():
       sourceTag: string
         source model's tag
       targetTag: string, optional, default 'randomTrain'
-        model's tag after train
+        model's tag after train')
       covariance: float, optional, default 1000 * 60 * 60 (1 hour)
         sequence covariance. And seq means are from `config` table
       algo_type: string, optional, default 'gmm'
+      description: string, optional, default 'This is a random train at YY/MM/DD'
+        train message, like `git commit message`
 
     Returns
     -------
@@ -150,7 +152,7 @@ def train_gmm_randomly():
       code: int
         0 success, 1 fail
       message: string
-      result: object, optional
+      result: object, optional')
     '''
     if request.headers.has_key('X-Request-Id') and request.headers['X-Request-Id']:
         x_request_id = request.headers['X-Request-Id']
@@ -184,6 +186,7 @@ def train_gmm_randomly():
     target_tag = incoming_data.get('targetTag', 'randomTrain')
     covariance = incoming_data.get('covariance', 3600000)
     algo_type = incoming_data.get('algo_type', 'gmm')
+    description = incoming_data.get('description', 'This is a random train at %s' % (arrow.now().ctime()))
 
     # Start train model
     poi_configs = dao.query_config()
