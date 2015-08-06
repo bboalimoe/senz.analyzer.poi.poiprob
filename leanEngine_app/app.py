@@ -552,7 +552,13 @@ def location2poiprob():
                 % (x_request_id, POI_URL, poi_request, poi_results))
 
     # parse poi_results
-    pois = core.parse_senz_pois(poi_results)
+    try:
+        pois = core.parse_senz_pois(poi_results)
+    except Exception,err:
+        print "err is",err
+        result['message'] = "Error is " + err.message + ", please refer to the pois parserhub"
+        return make_response(json.dumps(result), 500)
+
     if len(pois) == 0:
         result['message'] = "Pois = NULL, Please check request params"
         result['code'] = 102

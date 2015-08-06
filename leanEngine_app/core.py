@@ -105,7 +105,7 @@ def parse_senz_pois(senz_pois_response):
             pois.append('home')
         if user_place['tag'] == 'office':
             pois.append('work_office')
-
+    print "senz_pois_response is", senz_pois_response
     for parse_pois in senz_pois['pois']:
         poi = parse_pois['type']['mapping_type']
         if poi in ['unknown', 'others', 'unkown']:
