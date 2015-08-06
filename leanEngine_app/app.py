@@ -609,5 +609,5 @@ def is_alive():
 
     logger.info('<%s>, [isAlive] request from ip:%s, ua:%s' %(x_request_id, request.remote_addr,
                                                                        request.remote_user))
-    result = {'code': 0, 'message': 'Alive'}
+    result = {'code': 0, 'message': 'fuck you im Alive'}
     return json.dumps(result)
