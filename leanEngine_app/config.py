@@ -81,32 +81,37 @@ POI_AUTH_KEY = '5548eb2ade57fc001b000001b2ecfb11a7f94cc76678c7c18e123361'
 # poi level1 to level2 map
 RAW_POI_MAPPING = {
     'dining': [
-        'chinese_restaurant', 'japan_korea_restaurant', 'western_restaurant', 'bbq', 'chafing_dish', 'seafood',
-        'vegetarian_diet', 'muslim', 'buffet', 'dessert', 'cooler', 'snack_bar',
+        'chinese_restaurant', 'japan_korea_restaurant','japan_restaurant','korea_restaurant', 'western_restaurant', 'bbq', 'chafing_dish', 'seafood_restaurant',
+        'vegetarian_diet', 'muslim_dish', 'buffet', 'dessert', 'cooler_store', 'snack_bar','vegetarian_diet'
     ],
     'shopping': [
         'comprehensive_market', 'convenience_store', 'supermarket', 'digital_store', 'pet_market', 'furniture_store',
         'farmers_market', 'commodity_market', 'flea_market', 'sports_store', 'clothing_store', 'video_store',
-        'glass_store', 'mother_store', 'jewelry_store', 'cosmetics_store', 'gift_store', 'photography_store',
-        'pawnshop', 'antique_store', 'bike_store', 'cigarette_store', 'stationer',
+        'glass_store', 'mother_store', 'jewelry_store', 'cosmetics_store', 'gift_store',
+        'pawnshop', 'antique_store', 'bike_store', 'cigarette_store', 'stationer','motorcycle_sell','sports_store','shopping_street'
     ],
     'life_service': [
-        'travel_agency', 'ticket_agent', 'post_office', 'telecom_offices', 'newstand', 'water_supply_office',
-        'electricity_office', 'photographic_studio', 'laundry', 'talent_market', 'lottery_station', 'housekeeping',
-        'intermediary', 'pet_service', 'salvage_station', 'welfare_house', 'barbershop',
+        'travel_agency', 'ticket_agent','ticket_agent_plane', 'ticket_agent_train','post_office', 'telecom_offices' ,'telecom_offices_unicom', 'telecom_offices_netcom','newstand', 'water_supply_office',
+        'electricity_office', 'photographic_studio', 'laundry', 'talent_market', 'lottery_station', 'housekeeping','housekeeping_lock','housekeeping_hour','housekeeping_water_deliver',
+        'intermediary', 'pet_service', 'salvage_station', 'welfare_house', 'barbershop','laundry','ticket_agent_coach','housekeeping_nanny','housekeeping_house_moving',
+        'telecom_offices_tietong','ticket_agent_bus','telecom_offices_mobile','housekeeping_alliance_repair','telecom_offices_telecom'
     ],
     'entertainment': [
         'bath_sauna', 'ktv', 'bar', 'coffee', 'night_club', 'cinema', 'odeum', 'resort', 'outdoor', 'game_room',
-        'internet_bar',
+        'internet_bar','botanic_garden','music_hall','movie','playground','temple','aquarium','cultural_venues','fishing_garden','picking_garden','cultural_palace',
+        'memorial_hall','park','zoo','chess_room','bathing_beach','theater'
+    ],
+    'sports':[
+      'golf','skiing','sports_venues','football_field','tennis_court','horsemanship','race_course','basketball_court'
     ],
     'auto_related': [
-        'gas_station', 'parking_plot', 'auto_sale', 'auto_repair', 'motorcycle', 'car_maintenance', 'car_wash',
+        'gas_station', 'parking_plot', 'auto_sale', 'auto_repair', 'motorcycle', 'car_maintenance', 'car_wash','motorcycle_service','motorcycle_repair'
     ],
     'healthcare': [
-        'hospital', 'clinic', 'emergency_center', 'drugstore',
+        'hospital', 'clinic', 'emergency_center', 'drugstore','special_hospital'
     ],
     'hotel': [
-        'motel', 'hotel', 'economy_hotel', 'guest_house', 'hostel',
+        'motel', 'hotel', 'economy_hotel', 'guest_house', 'hostel','farm_house','villa','dormitory','other_hotel','apartment_hotel','inn','holiday_village'
     ],
     'scenic_spot': ['scenic_spot'
                     ],
@@ -115,21 +120,26 @@ RAW_POI_MAPPING = {
     ],
     'education': [
         'university', 'high_school', 'primary_school', 'kinder_garten', 'training_institutions', 'technical_school',
-        'adult_education',
+        'adult_education','scientific_research_institution','driving_school'
     ],
     'finance': [
-        'bank', 'atm', 'insurance_company', 'security_company',
+        'bank', 'atm', 'insurance_company', 'security_company'
     ],
     'infrastructure': [
-        'traffic', 'public_utilities', 'toll_station', 'other_infrastructure',
+        'public_utilities', 'toll_station', 'other_infrastructure','public_phone','factory' ,'city_square','refuge','public_toilet','church','industrial_area'
+    ],
+    'traffic':[
+      'traffic','bus_stop','subway','highway_service_area','railway_station','airport','coach_station','traffic_place','bus_route','subway_track'
+    ],
+    'government':[
+        'agriculture_forestry_and_fishing_base','foreign_institutional','government_agency','minor_institutions','tax_authorities'
     ],
     'estate': [
-        'residence', 'business_building'
+        'residence', 'business_building','community_center'
     ],
     'home': ['home'],
-    'office': ['work_office'],
+    'work_office': ['work_office'],
 }
-
 # poi level2 to level1 map
 DEFAULT_POI_MAPPING = {}
 for level1_poi in RAW_POI_MAPPING:
